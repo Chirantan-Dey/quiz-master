@@ -24,7 +24,7 @@ const Login = {
   methods: {
     async submitInfo() {
       const origin = window.location.origin;
-      const url = `${origin}/login`;
+      const url = `${origin}/`;
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -38,7 +38,13 @@ const Login = {
         const data = await res.json();
         console.log(data);
         // Handle successful login, e.g., redirect or store token
-        router.push("/profile");
+        this.$store.commit("setAuthToken", data.access_token);
+        this.$store.commit("setUser", data.user);
+        if (data.user.roles.some(role => role.name === 'admin')) {
+          router.push("/home-admin");
+        } else {
+          router.push("/home-user");
+        }
       } else {
         const errorData = await res.json();
         console.error("Login failed:", errorData);

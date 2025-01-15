@@ -46,9 +46,6 @@ const Signup = {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        console.log(data);
-        // Handle successful sign up, e.g., redirect or store token
         router.push("/login");
       } else {
         const errorData = await res.json();

@@ -1,5 +1,5 @@
 from flask_restful import Resource, Api, reqparse, marshal_with, fields
-from models import Subject, Quiz, Question, Score, Chapter, db
+from models import Subject, Quiz, Questions, Scores, Chapter, db
 from flask_security import auth_required
 
 parser = reqparse.RequestParser()
@@ -65,6 +65,26 @@ class SubjectResource(Resource):
         db.session.add(subject)
         db.session.commit()
         return {"message": "subject created"}
+    
+    @auth_required('token', 'session')
+    def put(self, id):
+        args = parser.parse_args()
+        subject = Subject.query.get(id)
+        if not subject:
+            return {"message": "subject not found"}, 404
+        for key, value in args.items():
+            setattr(subject, key, value)
+        db.session.commit()
+        return {"message": "subject updated"}
+
+    @auth_required('token', 'session')
+    def delete(self, id):
+        subject = Subject.query.get(id)
+        if not subject:
+            return {"message": "subject not found"}, 404
+        db.session.delete(subject)
+        db.session.commit()
+        return {"message": "subject deleted"}
 
 class QuizResource(Resource):
     @auth_required('token', 'session')
@@ -80,36 +100,96 @@ class QuizResource(Resource):
         db.session.add(quiz)
         db.session.commit()
         return {"message": "quiz created"}
+    
+    @auth_required('token', 'session')
+    def put(self, id):
+        args = parser.parse_args()
+        quiz = Quiz.query.get(id)
+        if not quiz:
+            return {"message": "quiz not found"}, 404
+        for key, value in args.items():
+            setattr(quiz, key, value)
+        db.session.commit()
+        return {"message": "quiz updated"}
+
+    @auth_required('token', 'session')
+    def delete(self, id):
+        quiz = Quiz.query.get(id)
+        if not quiz:
+            return {"message": "quiz not found"}, 404
+        db.session.delete(quiz)
+        db.session.commit()
+        return {"message": "quiz deleted"}
 
 class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
     def get(self):
-        all_questions = Question.query.all()
+        all_questions = Questions.query.all()
         return all_questions
 
     @auth_required('token', 'session')
     def post(self):
         args = parser.parse_args()
-        question = Question(**args)
+        question = Questions(**args)
         db.session.add(question)
         db.session.commit()
         return {"message": "question created"}
+    
+    @auth_required('token', 'session')
+    def put(self, id):
+        args = parser.parse_args()
+        question = Questions.query.get(id)
+        if not question:
+            return {"message": "question not found"}, 404
+        for key, value in args.items():
+            setattr(question, key, value)
+        db.session.commit()
+        return {"message": "question updated"}
+
+    @auth_required('token', 'session')
+    def delete(self, id):
+        question = Questions.query.get(id)
+        if not question:
+            return {"message": "question not found"}, 404
+        db.session.delete(question)
+        db.session.commit()
+        return {"message": "question deleted"}
 
 class ScoreResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(score_fields)
     def get(self):
-        all_scores = Score.query.all()
+        all_scores = Scores.query.all()
         return all_scores
 
     @auth_required('token', 'session')
     def post(self):
         args = parser.parse_args()
-        score = Score(**args)
+        score = Scores(**args)
         db.session.add(score)
         db.session.commit()
         return {"message": "score created"}
+    
+    @auth_required('token', 'session')
+    def put(self, id):
+        args = parser.parse_args()
+        score = Scores.query.get(id)
+        if not score:
+            return {"message": "score not found"}, 404
+        for key, value in args.items():
+            setattr(score, key, value)
+        db.session.commit()
+        return {"message": "score updated"}
+
+    @auth_required('token', 'session')
+    def delete(self, id):
+        score = Scores.query.get(id)
+        if not score:
+            return {"message": "score not found"}, 404
+        db.session.delete(score)
+        db.session.commit()
+        return {"message": "score deleted"}
 
 class ChapterResource(Resource):
     @auth_required('token', 'session')
@@ -125,9 +205,29 @@ class ChapterResource(Resource):
         db.session.add(chapter)
         db.session.commit()
         return {"message": "chapter created"}
+    
+    @auth_required('token', 'session')
+    def put(self, id):
+        args = parser.parse_args()
+        chapter = Chapter.query.get(id)
+        if not chapter:
+            return {"message": "chapter not found"}, 404
+        for key, value in args.items():
+            setattr(chapter, key, value)
+        db.session.commit()
+        return {"message": "chapter updated"}
 
-api.add_resource(SubjectResource, '/subjects')
-api.add_resource(QuizResource, '/quizzes')
-api.add_resource(QuestionResource, '/questions')
-api.add_resource(ScoreResource, '/scores')
-api.add_resource(ChapterResource, '/chapters')
+    @auth_required('token', 'session')
+    def delete(self, id):
+        chapter = Chapter.query.get(id)
+        if not chapter:
+            return {"message": "chapter not found"}, 404
+        db.session.delete(chapter)
+        db.session.commit()
+        return {"message": "chapter deleted"}
+
+api.add_resource(SubjectResource, '/subjects', '/subjects/<int:id>')
+api.add_resource(QuizResource, '/quizzes', '/quizzes/<int:id>')
+api.add_resource(QuestionResource, '/questions', '/questions/<int:id>')
+api.add_resource(ScoreResource, '/scores', '/scores/<int:id>')
+api.add_resource(ChapterResource, '/chapters', '/chapters/<int:id>')
