@@ -12,6 +12,7 @@ const Login = {
           <input v-model="password" type="password" class="form-control" placeholder="Password" required/>
         </div>
         <button class="btn btn-primary w-100" @click="submitInfo">Submit</button>
+        <button class="btn btn-link w-100" @click="goToSignup">Sign Up</button>
       </div>
     </div>
   `,
@@ -52,6 +53,9 @@ const Login = {
         // Handle login error
       }
     },
+    goToSignup() {
+      this.$router.push("/register");
+    }
   },
 };
 

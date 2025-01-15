@@ -10,7 +10,7 @@ const store = new Vuex.Store({
       localStorage.setItem("authToken", token); // Persist token in local storage
     },
     setUser(state, user) {
-      state.user = { ...user, role: user.roles && user.roles[0] ? user.roles[0].name : null };
+      state.user = { ...user };
     },
     logout(state) {
       state.authToken = "";

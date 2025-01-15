@@ -15,13 +15,13 @@ const Navbar = {
     },
     computed: {
       getHomeLink() {
-        return this.$store.state.user && this.$store.state.user.role === 'admin' ? '/home-admin' : '/home-user';
+        return this.$store.state.user && this.$store.state.user.roles.some(role => role.name === 'admin') ? '/home-admin' : '/home-user';
       },
       getQuizLink() {
-        return this.$store.state.user && this.$store.state.user.role === 'admin' ? '/quiz-admin' : '/quiz-user';
+        return this.$store.state.user && this.$store.state.user.roles.some(role => role.name === 'admin') ? '/quiz-admin' : '/quiz-user';
       },
       getSummaryLink() {
-          return this.$store.state.user && this.$store.state.user.role === 'admin' ? '/summary-admin' : '/summary-user';
+          return this.$store.state.user && this.$store.state.user.roles.some(role => role.name === 'admin') ? '/summary-admin' : '/summary-user';
       }
     }
 };
