@@ -19,6 +19,8 @@ class User(db.Model, UserMixin):
     dob = db.Column(db.Date)
     fs_uniquifier = db.Column(db.String(65), unique = True, nullable = False)
     roles = db.relationship('Role', secondary='user_roles')
+    scores = db.relationship('Scores', backref='user', lazy=True)
+
 
 class Role(db.Model, RoleMixin):
     id = db.Column(db.Integer, primary_key = True)
@@ -30,6 +32,8 @@ class Subject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
+    chapters = db.relationship('Chapter', backref='subject', lazy=True)
+
 
 
 class Quiz(db.Model):
@@ -38,7 +42,9 @@ class Quiz(db.Model):
     date_of_quiz = db.Column(db.Date)
     time_duration = db.Column(db.String)
     remarks = db.Column(db.String)
-
+    questions = db.relationship('Questions', backref='quiz', lazy=True)
+    scores = db.relationship('Scores', backref='quiz', lazy=True)
+    
 class Questions(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
@@ -57,3 +63,5 @@ class Chapter(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
+    subject_id = db.Column(db.Integer, db.ForeignKey('subject.id'), nullable=False) 
+    quizzes = db.relationship('Quiz', backref='chapter', lazy=True)

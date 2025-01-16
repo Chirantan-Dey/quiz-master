@@ -3,19 +3,7 @@ from models import Subject, Quiz, Questions, Scores, Chapter, db
 from flask_security import auth_required
 
 parser = reqparse.RequestParser()
-parser.add_argument('name', type=str, help="Name should be string", required=True)
-parser.add_argument('description', type=str, help="Description should be string")
 
-parser.add_argument('subject_id', type=int, help="Subject ID should be integer", required=True)
-parser.add_argument('title', type=str, help="Title should be string", required=True)
-
-parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
-parser.add_argument('text', type=str, help="Text should be string", required=True)
-parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
-
-parser.add_argument('student_id', type=int, help="Student ID should be integer", required=True)
-parser.add_argument('score', type=int, help="Score should be integer", required=True)
-parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
 
 api = Api(prefix='/api')
 
@@ -59,15 +47,21 @@ class SubjectResource(Resource):
         return all_subjects
 
     @auth_required('token', 'session')
+    @marshal_with(subject_fields)
     def post(self):
+        parser.add_argument('name', type=str, help="Name should be string", required=True)
+        parser.add_argument('description', type=str, help="Description should be string")
         args = parser.parse_args()
         subject = Subject(**args)
         db.session.add(subject)
         db.session.commit()
-        return {"message": "subject created"}
+        return subject
     
     @auth_required('token', 'session')
+    @marshal_with(subject_fields)
     def put(self, id):
+        parser.add_argument('name', type=str, help="Name should be string", required=True)
+        parser.add_argument('description', type=str, help="Description should be string")
         args = parser.parse_args()
         subject = Subject.query.get(id)
         if not subject:
@@ -75,9 +69,10 @@ class SubjectResource(Resource):
         for key, value in args.items():
             setattr(subject, key, value)
         db.session.commit()
-        return {"message": "subject updated"}
+        return subject
 
     @auth_required('token', 'session')
+    @marshal_with(subject_fields)
     def delete(self, id):
         subject = Subject.query.get(id)
         if not subject:
@@ -94,7 +89,10 @@ class QuizResource(Resource):
         return all_quizzes
 
     @auth_required('token', 'session')
+    @marshal_with(quiz_fields)
     def post(self):
+        parser.add_argument('subject_id', type=int, help="Subject ID should be integer", required=True)
+        parser.add_argument('title', type=str, help="Title should be string", required=True)
         args = parser.parse_args()
         quiz = Quiz(**args)
         db.session.add(quiz)
@@ -102,7 +100,10 @@ class QuizResource(Resource):
         return {"message": "quiz created"}
     
     @auth_required('token', 'session')
+    @marshal_with(quiz_fields)
     def put(self, id):
+        parser.add_argument('subject_id', type=int, help="Subject ID should be integer", required=True)
+        parser.add_argument('title', type=str, help="Title should be string", required=True)
         args = parser.parse_args()
         quiz = Quiz.query.get(id)
         if not quiz:
@@ -113,6 +114,7 @@ class QuizResource(Resource):
         return {"message": "quiz updated"}
 
     @auth_required('token', 'session')
+    @marshal_with(quiz_fields)
     def delete(self, id):
         quiz = Quiz.query.get(id)
         if not quiz:
@@ -129,7 +131,11 @@ class QuestionResource(Resource):
         return all_questions
 
     @auth_required('token', 'session')
+    @marshal_with(question_fields)
     def post(self):
+        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
+        parser.add_argument('text', type=str, help="Text should be string", required=True)
+        parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
         args = parser.parse_args()
         question = Questions(**args)
         db.session.add(question)
@@ -137,7 +143,11 @@ class QuestionResource(Resource):
         return {"message": "question created"}
     
     @auth_required('token', 'session')
+    @marshal_with(question_fields)
     def put(self, id):
+        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
+        parser.add_argument('text', type=str, help="Text should be string", required=True)
+        parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
         args = parser.parse_args()
         question = Questions.query.get(id)
         if not question:
@@ -148,6 +158,7 @@ class QuestionResource(Resource):
         return {"message": "question updated"}
 
     @auth_required('token', 'session')
+    @marshal_with(question_fields)
     def delete(self, id):
         question = Questions.query.get(id)
         if not question:
@@ -164,7 +175,11 @@ class ScoreResource(Resource):
         return all_scores
 
     @auth_required('token', 'session')
+    @marshal_with(score_fields)
     def post(self):
+        parser.add_argument('student_id', type=int, help="Student ID should be integer", required=True)
+        parser.add_argument('score', type=int, help="Score should be integer", required=True)
+        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
         args = parser.parse_args()
         score = Scores(**args)
         db.session.add(score)
@@ -172,7 +187,11 @@ class ScoreResource(Resource):
         return {"message": "score created"}
     
     @auth_required('token', 'session')
+    @marshal_with(score_fields)
     def put(self, id):
+        parser.add_argument('student_id', type=int, help="Student ID should be integer", required=True)
+        parser.add_argument('score', type=int, help="Score should be integer", required=True)
+        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
         args = parser.parse_args()
         score = Scores.query.get(id)
         if not score:
@@ -183,6 +202,7 @@ class ScoreResource(Resource):
         return {"message": "score updated"}
 
     @auth_required('token', 'session')
+    @marshal_with(score_fields)
     def delete(self, id):
         score = Scores.query.get(id)
         if not score:
@@ -199,15 +219,21 @@ class ChapterResource(Resource):
         return all_chapters
 
     @auth_required('token', 'session')
+    @marshal_with(chapter_fields)
     def post(self):
+        parser.add_argument('name', type=str, help="Name should be string", required=True)
+        parser.add_argument('subject_name', type=str, help="Subject Name should be string", required=True)
         args = parser.parse_args()
         chapter = Chapter(**args)
         db.session.add(chapter)
         db.session.commit()
-        return {"message": "chapter created"}
+        return chapter
     
     @auth_required('token', 'session')
+    @marshal_with(chapter_fields)
     def put(self, id):
+        parser.add_argument('name', type=str, help="Name should be string", required=True)
+        parser.add_argument('subject_name', type=str, help="Subject Name should be string", required=True)
         args = parser.parse_args()
         chapter = Chapter.query.get(id)
         if not chapter:
@@ -215,9 +241,10 @@ class ChapterResource(Resource):
         for key, value in args.items():
             setattr(chapter, key, value)
         db.session.commit()
-        return {"message": "chapter updated"}
+        return chapter
 
     @auth_required('token', 'session')
+    @marshal_with(chapter_fields)
     def delete(self, id):
         chapter = Chapter.query.get(id)
         if not chapter:
