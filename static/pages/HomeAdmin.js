@@ -31,22 +31,20 @@ const HomeAdmin = {
             </div>
             <button class="btn btn-primary" @click="openAddSubjectModal">Add Subject</button>
 
-            <div class="modal" :class="{ 'show': isChapterModalActive }">
+            <div class="modal" :class="{ 'show d-block': isChapterModalActive }">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title" v-if="editingChapter">Edit Chapter</h5>
                             <h5 class="modal-title" v-else>Add Chapter</h5>
-                            <button type="button" class="close" @click="closeChapterModal">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                            <button type="button" class="close" @click="closeChapterModal" data-dismiss="modal"> &times; </button>
                         </div>
                         <div class="modal-body">
                             <input type="text" class="form-control" v-model="chapterName" placeholder="Chapter Name">
                         </div>
                         <div class="modal-footer">
-                            <button class="btn btn-primary" @click="saveChapter">Save</button>
-                            <button class="btn btn-secondary" @click="closeChapterModal">Cancel</button>
+                            <button type="button" class="btn btn-primary" @click="saveChapter">Save</button>
+                            <button type="button" class="btn btn-secondary" @click="closeChapterModal">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -57,17 +55,15 @@ const HomeAdmin = {
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">Add Subject</h5>
-                            <button type="button" class="close" @click="closeSubjectModal" data-dismiss="modal">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                            <button type="button" class="close" @click="closeSubjectModal" data-dismiss="modal"> &times; </button>
                         </div>
                         <div class="modal-body">
                             <input type="text" class="form-control mb-2" v-model="subjectName" placeholder="Subject Name">
                             <textarea class="form-control" v-model="subjectDescription" placeholder="Subject Description"></textarea>
                         </div>
                         <div class="modal-footer">
-                            <button class="btn btn-primary" @click="saveSubject">Save</button>
-                            <button class="btn btn-secondary" @click="closeSubjectModal">Cancel</button>
+                            <button type="button" class="btn btn-primary" @click="saveSubject">Save</button>
+                            <button type="button" class="btn btn-secondary" @click="closeSubjectModal">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -110,10 +106,12 @@ const HomeAdmin = {
             document.body.classList.add('modal-open');
         },
         openAddChapterModal(subjectName) {
+            console.log('openAddChapterModal called');
             this.editingChapter = null;
             this.chapterName = '';
             this.selectedSubjectName = subjectName;
             this.isChapterModalActive = true;
+            console.log('isChapterModalActive:', this.isChapterModalActive);
             document.body.classList.add('modal-open');
         },
         closeChapterModal() {
@@ -131,6 +129,7 @@ const HomeAdmin = {
             document.body.classList.remove('modal-open');
         },
         async saveChapter() {
+            console.log('saveChapter called');
             try {
                 const chapterData = {
                     name: this.chapterName,
@@ -152,7 +151,7 @@ const HomeAdmin = {
                 });
 
                 if (response.ok) {
-                    this.fetchSubjects();
+                    await this.fetchSubjects();
                     this.closeChapterModal();
                 } else {
                     console.error('Failed to save chapter:', response.status, response.statusText, await response.json());
@@ -194,7 +193,7 @@ const HomeAdmin = {
                 });
 
                 if (response.ok) {
-                    this.fetchSubjects();
+                    await this.fetchSubjects();
                     this.closeSubjectModal();
                 } else {
                     const errorData = await response.json();

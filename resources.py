@@ -15,7 +15,7 @@ subject_fields = {
 
 quiz_fields = {
     'id': fields.Integer,
-    'subject_id': fields.Integer,
+    'chapter_id': fields.Integer,
     'title': fields.String
 }
 
@@ -224,7 +224,12 @@ class ChapterResource(Resource):
         parser.add_argument('name', type=str, help="Name should be string", required=True)
         parser.add_argument('subject_name', type=str, help="Subject Name should be string", required=True)
         args = parser.parse_args()
-        chapter = Chapter(**args)
+
+        subject = Subject.query.filter_by(name=args['subject_name']).first()
+        if not subject:
+            return {"message": "Subject not found"}, 404
+
+        chapter = Chapter(name=args['name'], subject_id=subject.id)
         db.session.add(chapter)
         db.session.commit()
         return chapter
