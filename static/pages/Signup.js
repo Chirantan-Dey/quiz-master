@@ -46,7 +46,7 @@ const Signup = {
         // Handle successful login, e.g., redirect or store token
         this.$store.commit("setAuthToken", data.access_token);
         this.$store.commit("setUser", data.user);
-        if (data.user.roles.includes('admin')) {
+        if (data.user.roles.some(role => role.name === 'admin')) {
           router.push("/home-admin");
         } else {
           router.push("/home-user");

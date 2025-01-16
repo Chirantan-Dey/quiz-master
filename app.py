@@ -49,7 +49,7 @@ def create_app():
         if user and verify_password(data['password'], user.password):
             login_user(user)
             auth_token = user.get_auth_token()
-            return jsonify({'access_token': auth_token, 'user': {'id': user.id, 'email': user.email, 'roles': [role.name for role in user.roles]}}), 200
+            return jsonify({'access_token': auth_token, 'user': {'id': user.id, 'email': user.email, 'roles': [{'name': role.name} for role in user.roles]}}), 200
         return jsonify({'message': 'Invalid credentials'}), 401
 
     return app

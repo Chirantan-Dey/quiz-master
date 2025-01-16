@@ -2,19 +2,21 @@ const store = new Vuex.Store({
   state: {
     authToken: localStorage.getItem("authToken") || "",
     test: "to test vuex working",
-    user: null, // User profile data can be stored here
+    user: JSON.parse(localStorage.getItem("user")) || null,
   },
   mutations: {
     setAuthToken(state, token) {
       state.authToken = token;
-      localStorage.setItem("authToken", token); // Persist token in local storage
+      localStorage.setItem("authToken", token);
     },
     setUser(state, user) {
-      state.user = { ...user };
+      state.user = { ...user, roles: user.roles || [] };
+      localStorage.setItem("user", JSON.stringify(state.user));
     },
     logout(state) {
       state.authToken = "";
-      localStorage.removeItem("authToken"); // Remove token from local storage on logout
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
       state.user = null;
     },
   },
@@ -23,6 +25,7 @@ const store = new Vuex.Store({
   },
   getters: {
     isLoggedIn: (state) => !!state.authToken,
+    userRoles: (state) => state.user?.roles || [],
   },
 });
 
