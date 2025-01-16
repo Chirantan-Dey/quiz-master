@@ -14,6 +14,10 @@ const routes = [
     component: Login,
   },
   {
+    path: "/login",
+    component: Login,
+  },
+  {
     path: "/home-admin",
     component: HomeAdmin,
   },
@@ -21,11 +25,11 @@ const routes = [
     path: "/home-user",
     component: HomeUser,
   },
-    {
+  {
     path: "/quiz-admin",
     component: QuizAdmin,
   },
-    {
+  {
     path: "/quiz-user",
     component: QuizUser,
   },
