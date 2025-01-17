@@ -53,7 +53,7 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
             chapters = db.session.query(Chapter).filter(Chapter.subject_id == subject.id).all()
             chapter_list = []
             for chapter in chapters:
-                chapter_list.append({ 'id': chapter.id, 'name': chapter.name })
+                chapter_list.append({ 'id': chapter.id, 'name': chapter.name, 'description': chapter.description })
             subject_list.append({ 'name': subject.name, 'chapters': chapter_list })
         return jsonify(subject_list)
 
@@ -69,3 +69,53 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
                 question_list.append({ 'id': question.id, 'text': question.text })
             quiz_list.append({ 'title': quiz.title, 'questions': question_list })
         return jsonify(quiz_list)
+    
+    @app.route('/api/chapters', methods=['POST'])
+    @auth_required('token', 'session')
+    def create_chapter():
+        data = request.get_json()
+        name = data.get('name')
+        description = data.get('description')
+        subject_name = data.get('subject_name')
+
+        if not name or not description or not subject_name:
+            return jsonify({'message': 'Invalid input'}), 400
+        
+        subject = db.session.query(Subject).filter(Subject.name == subject_name).first()
+        if not subject:
+            return jsonify({'message': 'Subject not found'}), 404
+
+        chapter = Chapter(name=name, description=description, subject_id=subject.id)
+        db.session.add(chapter)
+        db.session.commit()
+        return jsonify({'message': 'Chapter created successfully', 'chapter': {'id': chapter.id, 'name': chapter.name, 'description': chapter.description}}), 201
+
+    @app.route('/api/chapters/<int:chapter_id>', methods=['PUT'])
+    @auth_required('token', 'session')
+    def update_chapter(chapter_id):
+        data = request.get_json()
+        name = data.get('name')
+        description = data.get('description')
+
+        if not name or not description:
+            return jsonify({'message': 'Invalid input'}), 400
+
+        chapter = db.session.query(Chapter).filter(Chapter.id == chapter_id).first()
+        if not chapter:
+            return jsonify({'message': 'Chapter not found'}), 404
+
+        chapter.name = name
+        chapter.description = description
+        db.session.commit()
+        return jsonify({'message': 'Chapter updated successfully', 'chapter': {'id': chapter.id, 'name': chapter.name, 'description': chapter.description}})
+
+    @app.route('/api/chapters/<int:chapter_id>', methods=['DELETE'])
+    @auth_required('token', 'session')
+    def delete_chapter(chapter_id):
+        chapter = db.session.query(Chapter).filter(Chapter.id == chapter_id).first()
+        if not chapter:
+            return jsonify({'message': 'Chapter not found'}), 404
+        
+        db.session.delete(chapter)
+        db.session.commit()
+        return jsonify({'message': 'Chapter deleted successfully'})

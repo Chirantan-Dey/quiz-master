@@ -112,6 +112,7 @@ const HomeAdmin = {
             console.log('openAddChapterModal called');
             this.editingChapter = null;
             this.chapterName = '';
+            this.chapterDescription = '';
             this.selectedSubjectName = subjectName;
             this.isChapterModalActive = true;
             console.log('isChapterModalActive:', this.isChapterModalActive);
