@@ -10,12 +10,14 @@ const HomeAdmin = {
                     <thead>
                         <tr>
                             <th>Chapter Name</th>
+                            <th>Description</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="chapter in subject.chapters" :key="chapter.id">
                             <td>{{ chapter.name }}</td>
+                            <td>{{ chapter.description }}</td>
                             <td>
                                 <button class="btn btn-sm btn-primary mr-2" @click="openEditChapterModal(chapter)">Edit</button>
                                 <button class="btn btn-sm btn-danger" @click="handleDeleteChapter(chapter.id)">Delete</button>
@@ -40,7 +42,8 @@ const HomeAdmin = {
                             <button type="button" class="close" @click="closeChapterModal" data-dismiss="modal"> &times; </button>
                         </div>
                         <div class="modal-body">
-                            <input type="text" class="form-control" v-model="chapterName" placeholder="Chapter Name">
+                            <input type="text" class="form-control mb-2" v-model="chapterName" placeholder="Chapter Name">
+                            <input type="text" class="form-control" v-model="chapterDescription" placeholder="Chapter Description">
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-primary" @click="saveChapter">Save</button>
@@ -101,6 +104,7 @@ const HomeAdmin = {
         openEditChapterModal(chapter) {
             this.editingChapter = chapter;
             this.chapterName = chapter.name;
+            this.chapterDescription = chapter.description;
             this.isChapterModalActive = true;
             document.body.classList.add('modal-open');
         },
@@ -132,6 +136,7 @@ const HomeAdmin = {
             try {
                 const chapterData = {
                     name: this.chapterName,
+                    description: this.chapterDescription,
                     subject_name: this.selectedSubjectName
                 };
 

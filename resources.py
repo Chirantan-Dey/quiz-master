@@ -43,7 +43,20 @@ class SubjectResource(Resource):
     @marshal_with(subject_fields)
     def get(self):
         all_subjects = Subject.query.all()
-        return all_subjects
+        result = []
+        for subject in all_subjects:
+            chapters = Chapter.query.filter_by(subject_id=subject.id).all()
+            subject_data = {
+                'id': subject.id,
+                'name': subject.name,
+                'chapters': [{
+                    'id': chapter.id,
+                    'name': chapter.name,
+                    'description': chapter.description
+                } for chapter in chapters]
+            }
+            result.append(subject_data)
+        return result
 
     @auth_required('token', 'session')
     @marshal_with(subject_fields)
@@ -220,13 +233,14 @@ class ChapterResource(Resource):
     def post(self):
         parser.add_argument('name', type=str, help="Name should be string", required=True)
         parser.add_argument('subject_name', type=str, help="Subject Name should be string", required=True)
+        parser.add_argument('description', type=str, help="Description should be string", required=False)
         args = parser.parse_args()
 
         subject = Subject.query.filter_by(name=args['subject_name']).first()
         if not subject:
             return {"message": "Subject not found"}, 404
 
-        chapter = Chapter(name=args['name'], subject_id=subject.id)
+        chapter = Chapter(name=args['name'], subject_id=subject.id, description=args.get('description'))
         db.session.add(chapter)
         db.session.commit()
         return chapter
@@ -236,12 +250,21 @@ class ChapterResource(Resource):
     def put(self, id):
         parser.add_argument('name', type=str, help="Name should be string", required=True)
         parser.add_argument('subject_name', type=str, help="Subject Name should be string", required=True)
+        parser.add_argument('description', type=str, help="Description should be string", required=False)
         args = parser.parse_args()
+
         chapter = Chapter.query.get(id)
         if not chapter:
             return {"message": "chapter not found"}, 404
-        for key, value in args.items():
-            setattr(chapter, key, value)
+        
+        subject = Subject.query.filter_by(name=args['subject_name']).first()
+        if not subject:
+            return {"message": "Subject not found"}, 404
+        
+        chapter.name = args['name']
+        chapter.subject_id = subject.id
+        if 'description' in args:
+            chapter.description = args['description']
         db.session.commit()
         return chapter
 
