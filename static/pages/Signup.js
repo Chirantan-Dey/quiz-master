@@ -29,13 +29,13 @@ const Signup = {
   methods: {
     async submitInfo() {
       const origin = window.location.origin;
-      const url = `${origin}/`;
+      const url = `${origin}/register`;
       const res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: this.email, password: this.password }),
+        body: JSON.stringify({ email: this.email, password: this.password, role: 'stud' }),
         credentials: "same-origin", // Include credentials (cookies) with the request
       });
 
