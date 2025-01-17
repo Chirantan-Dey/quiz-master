@@ -23,7 +23,7 @@ const QuizAdmin = {
                     </tr>
                     <tr>
                         <td colspan="2">
-                            <button class="btn btn-sm btn-success" @click="openAddQuestionModal(quiz.name)">Add Question</button>
+                            <button class="btn btn-sm btn-success" @click="openAddQuestionModal(quiz)">Add Question</button>
                         </td>
                     </tr>
                 </tbody>
@@ -63,7 +63,9 @@ const QuizAdmin = {
                     </div>
                     <div class="modal-body">
                         <input type="text" class="form-control" v-model="quizName" placeholder="Quiz Name"><br>
-                        <input type="number" class="form-control" v-model="chapterId" placeholder="Chapter ID"><br>
+                        <select class="form-control" v-model="chapterId">
+                            <option v-for="chapter in chapters" :key="chapter.id" :value="chapter.id">{{ chapter.name }}</option>
+                        </select><br>
                         <input type="date" class="form-control" v-model="dateOfQuiz" placeholder="Date of Quiz"><br>
                         <input type="number" class="form-control" v-model="timeDuration" placeholder="Time Duration"><br>
                         <input type="text" class="form-control" v-model="remarks" placeholder="Remarks">
@@ -85,15 +87,17 @@ const QuizAdmin = {
             editingQuestion: null,
             questionText: '',
             quizName: '',
-            selectedQuizName: '',
+            selectedQuizId: null,
             chapterId: '',
             dateOfQuiz: '',
             timeDuration: '',
             remarks: '',
+            chapters: [],
         };
     },
     mounted() {
         this.fetchQuizzes();
+        this.fetchChapters();
     },
     methods: {
         async fetchQuizzes() {
@@ -109,16 +113,29 @@ const QuizAdmin = {
                 console.error('Error fetching quizzes:', error);
             }
         },
+        async fetchChapters() {
+            try {
+                const response = await fetch('/api/chapters', {
+                    headers: {
+                        'Authentication-Token': store.state.authToken
+                    }
+                });
+                const data = await response.json();
+                this.chapters = data;
+            } catch (error) {
+                console.error('Error fetching chapters:', error);
+            }
+        },
         openEditQuestionModal(question) {
             this.editingQuestion = question;
             this.questionText = question.text;
             this.isQuestionModalActive = true;
             $('#questionModal').modal('show');
         },
-        openAddQuestionModal(quizName) {
+        openAddQuestionModal(quiz) {
             this.editingQuestion = null;
             this.questionText = '';
-            this.selectedQuizName = quizName;
+            this.selectedQuizId = quiz.id;
             this.isQuestionModalActive = true;
             $('#questionModal').modal('show');
         },
@@ -146,7 +163,7 @@ const QuizAdmin = {
                     await fetch('/api/questions', {
                         method: 'POST',
                         headers,
-                        body: JSON.stringify({text: this.questionText, quiz_name: this.selectedQuizName}),
+                        body: JSON.stringify({text: this.questionText, quiz_id: this.selectedQuizId}),
                     });
                 }
                 this.fetchQuizzes();
@@ -169,6 +186,7 @@ const QuizAdmin = {
             }
         },
         openAddQuizModal() {
+            console.log('openAddQuizModal called');
             this.isQuizModalActive = true;
             this.quizName = '';
             $('#addQuizModal').modal('show');
