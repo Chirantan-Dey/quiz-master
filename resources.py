@@ -20,13 +20,17 @@ quiz_fields = {
     'time_duration': fields.Integer,
     'remarks': fields.String,
     'name': fields.String,
+    'option1': fields.String,
+    'option2': fields.String
 }
 
 question_fields = {
     'id': fields.Integer,
     'quiz_id': fields.Integer,
     'text': fields.String,
-    'correct_answer': fields.String
+    'correct_answer': fields.String,
+    'option1': fields.String,
+    'option2': fields.String
 }
 
 score_fields = {
@@ -110,6 +114,8 @@ class QuizResource(Resource):
         parser.add_argument('date_of_quiz', type=str, help="Date of quiz should be string", required=False)
         parser.add_argument('time_duration', type=int, help="Time duration should be integer", required=False)
         parser.add_argument('remarks', type=str, help="Remarks should be string", required=False)
+        parser.add_argument('option1', type=str, help="Option 1 should be string", required=False)
+        parser.add_argument('option2', type=str, help="Option 2 should be string", required=False)
         args = parser.parse_args()
         date_of_quiz_str = args.get('date_of_quiz')
         if date_of_quiz_str:
@@ -125,7 +131,9 @@ class QuizResource(Resource):
             chapter_id=args.get('chapter_id'),
             date_of_quiz=date_of_quiz,
             time_duration=args.get('time_duration'),
-            remarks=args.get('remarks')
+            remarks=args.get('remarks'),
+            option1=args.get('option1'),
+            option2=args.get('option2')
         )
         db.session.add(quiz)
         db.session.commit()
@@ -139,6 +147,8 @@ class QuizResource(Resource):
         parser.add_argument('date_of_quiz', type=str, help="Date of quiz should be string", required=False)
         parser.add_argument('time_duration', type=int, help="Time duration should be integer", required=False)
         parser.add_argument('remarks', type=str, help="Remarks should be string", required=False)
+        parser.add_argument('option1', type=str, help="Option 1 should be string", required=False)
+        parser.add_argument('option2', type=str, help="Option 2 should be string", required=False)
         args = parser.parse_args()
         quiz = Quiz.query.get(id)
         if not quiz:
@@ -158,6 +168,8 @@ class QuizResource(Resource):
 
         quiz.time_duration = args.get('time_duration')
         quiz.remarks = args.get('remarks')
+        quiz.option1 = args.get('option1')
+        quiz.option2 = args.get('option2')
         db.session.commit()
         return {"message": "quiz updated"}
 
@@ -184,6 +196,8 @@ class QuestionResource(Resource):
         parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
         parser.add_argument('text', type=str, help="Text should be string", required=True)
         parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
+        parser.add_argument('option1', type=str, help="Option 1 should be string", required=True)
+        parser.add_argument('option2', type=str, help="Option 2 should be string", required=True)
         args = parser.parse_args()
         question = Questions(**args)
         db.session.add(question)
@@ -196,6 +210,8 @@ class QuestionResource(Resource):
         parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
         parser.add_argument('text', type=str, help="Text should be string", required=True)
         parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
+        parser.add_argument('option1', type=str, help="Option 1 should be string", required=True)
+        parser.add_argument('option2', type=str, help="Option 2 should be string", required=True)
         args = parser.parse_args()
         question = Questions.query.get(id)
         if not question:

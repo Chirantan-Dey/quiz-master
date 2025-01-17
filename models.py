@@ -52,6 +52,7 @@ class Questions(db.Model):
     question_statement = db.Column(db.String, nullable=False)
     option1 = db.Column(db.String, nullable=False)
     option2 = db.Column(db.String, nullable=False)
+    correct_answer = db.Column(db.String, nullable=False)
 
 class Scores(db.Model):
     id = db.Column(db.Integer, primary_key=True)

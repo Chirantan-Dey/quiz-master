@@ -42,7 +42,6 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
             return jsonify({'message' : 'Student successfully created', 'user': {'email': user.email, 'roles': [{'name': 'stud'}]}})
         
         return jsonify({'message' : 'invalid role'}), 400
-
    
     @app.route('/api/subjects')
     @auth_required('token', 'session')
@@ -66,7 +65,7 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
             questions = db.session.query(Questions).filter(Questions.quiz_id == quiz.id).all()
             question_list = []
             for question in questions:
-                question_list.append({ 'id': question.id, 'text': question.text })
+                question_list.append({ 'id': question.id, 'text': question.question_statement, 'option1': question.option1, 'option2': question.option2, 'correctAnswer': question.correct_answer })
             quiz_list.append({ 'name': quiz.name, 'questions': question_list })
         return jsonify(quiz_list)
     
@@ -119,3 +118,83 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
         db.session.delete(chapter)
         db.session.commit()
         return jsonify({'message': 'Chapter deleted successfully'})
+    
+    @app.route('/api/questions', methods=['POST'])
+    @auth_required('token', 'session')
+    def create_question():
+        data = request.get_json()
+        text = data.get('text')
+        option1 = data.get('option1')
+        option2 = data.get('option2')
+        correct_answer = data.get('correctAnswer')
+        quiz_id = data.get('quiz_id')
+
+        if not text or not option1 or not option2 or not quiz_id or not correct_answer:
+            return jsonify({'message': 'Invalid input'}), 400
+        
+        quiz = db.session.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            return jsonify({'message': 'Quiz not found'}), 404
+        
+        question = Questions(question_statement=text, option1=option1, option2=option2, quiz_id=quiz_id, correct_answer=correct_answer)
+        db.session.add(question)
+        db.session.commit()
+        return jsonify({'message': 'Question created successfully', 'question': {'id': question.id, 'text': question.question_statement, 'option1': question.option1, 'option2': question.option2, 'correctAnswer': question.correct_answer}}), 201
+
+    @app.route('/api/questions/<int:question_id>', methods=['PUT'])
+    @auth_required('token', 'session')
+    def update_question(question_id):
+        data = request.get_json()
+        text = data.get('text')
+        option1 = data.get('option1')
+        option2 = data.get('option2')
+        correct_answer = data.get('correctAnswer')
+
+        if not text or not option1 or not option2 or not correct_answer:
+            return jsonify({'message': 'Invalid input'}), 400
+        
+        question = db.session.query(Questions).filter(Questions.id == question_id).first()
+        if not question:
+            return jsonify({'message': 'Question not found'}), 404
+        
+        question.question_statement = text
+        question.option1 = option1
+        question.option2 = option2
+        question.correct_answer = correct_answer
+        db.session.commit()
+        return jsonify({'message': 'Question updated successfully', 'question': {'id': question.id, 'text': question.question_statement, 'option1': question.option1, 'option2': question.option2, 'correctAnswer': question.correct_answer}})
+    
+    @app.route('/api/questions/<int:question_id>', methods=['DELETE'])
+    @auth_required('token', 'session')
+    def delete_question(question_id):
+        question = db.session.query(Questions).filter(Questions.id == question_id).first()
+        if not question:
+            return jsonify({'message': 'Question not found'}), 404
+        
+        db.session.delete(question)
+        db.session.commit()
+        return jsonify({'message': 'Question deleted successfully'})
+    
+    @app.route('/api/quizzes', methods=['POST'])
+    @auth_required('token', 'session')
+    def create_quiz():
+        data = request.get_json()
+        name = data.get('name')
+        chapter_id = data.get('chapter_id')
+        date_of_quiz = data.get('date_of_quiz')
+        time_duration = data.get('time_duration')
+        remarks = data.get('remarks')
+
+        if not name or not chapter_id or not date_of_quiz or not time_duration:
+            return jsonify({'message': 'Invalid input'}), 400
+        
+        chapter = db.session.query(Chapter).filter(Chapter.id == chapter_id).first()
+        if not chapter:
+            return jsonify({'message': 'Chapter not found'}), 404
+        
+        quiz = Quiz(name=name, chapter_id=chapter_id, date_of_quiz=date_of_quiz, time_duration=time_duration, remarks=remarks)
+        db.session.add(quiz)
+        db.session.commit()
+        return jsonify({'message': 'Quiz created successfully', 'quiz': {'id': quiz.id, 'name': quiz.name, 'chapter_id': quiz.chapter_id, 'date_of_quiz': quiz.date_of_quiz, 'time_duration': quiz.time_duration, 'remarks': quiz.remarks}}), 201
+    
+    return app

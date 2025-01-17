@@ -1,6 +1,10 @@
 import store from '../utils/store.js';
+import Question from '../components/Question.js';
 
 const QuizAdmin = {
+    components: {
+        Question
+    },
     template: `
     <div class="container">
         <h1>Quiz Admin</h1>
@@ -10,19 +14,28 @@ const QuizAdmin = {
                 <thead>
                     <tr>
                         <th>Question Text</th>
+                        <th>Option 1</th>
+                        <th>Option 2</th>
+                        <th>Correct Answer</th>
+                        <th>Quiz</th>
+                        <th>Creator</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="question in quiz.questions" :key="question.id">
-                        <td>{{ question.text }}</td>
-                        <td>
-                            <button class="btn btn-sm btn-primary mr-2" @click="openEditQuestionModal(question)">Edit</button>
-                            <button class="btn btn-sm btn-danger" @click="handleDeleteQuestion(question.id)">Delete</button>
-                        </td>
-                    </tr>
+                    <question
+                        v-for="question in quiz.questions"
+                        :key="question.id"
+                        :text="question.text"
+                        :option1="question.option1"
+                        :option2="question.option2"
+                        :correct-answer="question.correct_answer"
+                        :quiz="quiz.name"
+                        :creator="question.creator"
+                    >
+                    </question>
                     <tr>
-                        <td colspan="2">
+                        <td colspan="7">
                             <button class="btn btn-sm btn-success" @click="openAddQuestionModal(quiz)">Add Question</button>
                         </td>
                     </tr>
@@ -42,7 +55,10 @@ const QuizAdmin = {
                         </button>
                     </div>
                     <div class="modal-body">
-                        <input type="text" class="form-control" v-model="questionText" placeholder="Question Text">
+                        <input type="text" class="form-control" v-model="questionText" placeholder="Question Text"><br>
+                        <input type="text" class="form-control" v-model="option1" placeholder="Option 1"><br>
+                        <input type="text" class="form-control" v-model="option2" placeholder="Option 2"><br>
+                        <input type="text" class="form-control" v-model="correctAnswer" placeholder="Correct Answer">
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -86,6 +102,9 @@ const QuizAdmin = {
             isQuizModalActive: false,
             editingQuestion: null,
             questionText: '',
+            option1: '',
+            option2: '',
+            correctAnswer: '',
             quizName: '',
             selectedQuizId: null,
             chapterId: '',
@@ -129,12 +148,18 @@ const QuizAdmin = {
         openEditQuestionModal(question) {
             this.editingQuestion = question;
             this.questionText = question.text;
+            this.option1 = question.option1;
+            this.option2 = question.option2;
+            this.correctAnswer = question.correct_answer;
             this.isQuestionModalActive = true;
             $('#questionModal').modal('show');
         },
         openAddQuestionModal(quiz) {
             this.editingQuestion = null;
             this.questionText = '';
+            this.option1 = '';
+            this.option2 = '';
+            this.correctAnswer = '';
             this.selectedQuizId = quiz.id;
             this.isQuestionModalActive = true;
             $('#questionModal').modal('show');
@@ -144,6 +169,9 @@ const QuizAdmin = {
             this.isQuestionModalActive = false;
             this.editingQuestion = null;
             this.questionText = '';
+            this.option1 = '';
+            this.option2 = '';
+            this.correctAnswer = '';
             $('#questionModal').modal('hide');
         },
         async saveQuestion() {
@@ -152,8 +180,15 @@ const QuizAdmin = {
                     'Content-Type': 'application/json',
                     'Authentication-Token': store.state.authToken
                 };
-                const body = JSON.stringify({text: this.questionText});
+
                 if (this.editingQuestion) {
+                    const body = JSON.stringify({
+                        quiz_id: this.editingQuestion.quiz_id,
+                        text: this.questionText,
+                        option1: this.option1,
+                        option2: this.option2,
+                        correct_answer: this.correctAnswer
+                    });
                     await fetch(`/api/questions/${this.editingQuestion.id}`, {
                         method: 'PUT',
                         headers,
@@ -163,7 +198,13 @@ const QuizAdmin = {
                     await fetch('/api/questions', {
                         method: 'POST',
                         headers,
-                        body: JSON.stringify({text: this.questionText, quiz_id: this.selectedQuizId}),
+                        body: JSON.stringify({
+                            quiz_id: this.selectedQuizId,
+                            text: this.questionText,
+                            option1: this.option1,
+                            option2: this.option2,
+                            correct_answer: this.correctAnswer
+                        }),
                     });
                 }
                 this.fetchQuizzes();
