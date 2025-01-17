@@ -9,8 +9,7 @@ api = Api(prefix='/api')
 
 subject_fields = {
     'id': fields.Integer,
-    'name': fields.String,
-    'description': fields.String
+    'name': fields.String
 }
 
 quiz_fields = {
@@ -50,9 +49,8 @@ class SubjectResource(Resource):
     @marshal_with(subject_fields)
     def post(self):
         parser.add_argument('name', type=str, help="Name should be string", required=True)
-        parser.add_argument('description', type=str, help="Description should be string")
         args = parser.parse_args()
-        subject = Subject(**args)
+        subject = Subject(name=args['name'], description=None)
         db.session.add(subject)
         db.session.commit()
         return subject
@@ -61,13 +59,12 @@ class SubjectResource(Resource):
     @marshal_with(subject_fields)
     def put(self, id):
         parser.add_argument('name', type=str, help="Name should be string", required=True)
-        parser.add_argument('description', type=str, help="Description should be string")
         args = parser.parse_args()
         subject = Subject.query.get(id)
         if not subject:
             return {"message": "subject not found"}, 404
-        for key, value in args.items():
-            setattr(subject, key, value)
+        subject.name = args['name']
+        subject.description = None
         db.session.commit()
         return subject
 

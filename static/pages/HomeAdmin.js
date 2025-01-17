@@ -59,7 +59,6 @@ const HomeAdmin = {
                         </div>
                         <div class="modal-body">
                             <input type="text" class="form-control mb-2" v-model="subjectName" placeholder="Subject Name">
-                            <textarea class="form-control" v-model="subjectDescription" placeholder="Subject Description"></textarea>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-primary" @click="saveSubject">Save</button>
@@ -188,7 +187,6 @@ const HomeAdmin = {
                     },
                     body: JSON.stringify({
                         name: this.subjectName,
-                        description: this.subjectDescription
                     })
                 });
 
