@@ -38,9 +38,10 @@ class Subject(db.Model):
 
 class Quiz(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
     chapter_id = db.Column(db.Integer, db.ForeignKey('chapter.id'), nullable=False)
     date_of_quiz = db.Column(db.Date)
-    time_duration = db.Column(db.String)
+    time_duration = db.Column(db.Integer)
     remarks = db.Column(db.String)
     questions = db.relationship('Questions', backref='quiz', lazy=True)
     scores = db.relationship('Scores', backref='quiz', lazy=True)

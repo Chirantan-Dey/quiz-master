@@ -1,6 +1,7 @@
 from flask_restful import Resource, Api, reqparse, marshal_with, fields
 from models import Subject, Quiz, Questions, Scores, Chapter, db
 from flask_security import auth_required
+from datetime import datetime
 
 parser = reqparse.RequestParser()
 
@@ -15,7 +16,10 @@ subject_fields = {
 quiz_fields = {
     'id': fields.Integer,
     'chapter_id': fields.Integer,
-    'title': fields.String
+    'date_of_quiz': fields.String,
+    'time_duration': fields.Integer,
+    'remarks': fields.String,
+    'name': fields.String,
 }
 
 question_fields = {
@@ -101,25 +105,59 @@ class QuizResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(quiz_fields)
     def post(self):
-        parser.add_argument('subject_id', type=int, help="Subject ID should be integer", required=True)
-        parser.add_argument('title', type=str, help="Title should be string", required=True)
+        parser.add_argument('name', type=str, help="Name should be string", required=True)
+        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
+        parser.add_argument('date_of_quiz', type=str, help="Date of quiz should be string", required=False)
+        parser.add_argument('time_duration', type=int, help="Time duration should be integer", required=False)
+        parser.add_argument('remarks', type=str, help="Remarks should be string", required=False)
         args = parser.parse_args()
-        quiz = Quiz(**args)
+        date_of_quiz_str = args.get('date_of_quiz')
+        if date_of_quiz_str:
+            try:
+                date_of_quiz = datetime.strptime(date_of_quiz_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+            except ValueError:
+                return {"message": "Invalid date format. Please use YYYY-MM-DDTHH:MM:SS.ffffffZ"}, 400
+        else:
+            date_of_quiz = None
+
+        quiz = Quiz(
+            name=args.get('name'),
+            chapter_id=args.get('chapter_id'),
+            date_of_quiz=date_of_quiz,
+            time_duration=args.get('time_duration'),
+            remarks=args.get('remarks')
+        )
         db.session.add(quiz)
         db.session.commit()
-        return {"message": "quiz created"}
+        return quiz
     
     @auth_required('token', 'session')
     @marshal_with(quiz_fields)
     def put(self, id):
-        parser.add_argument('subject_id', type=int, help="Subject ID should be integer", required=True)
-        parser.add_argument('title', type=str, help="Title should be string", required=True)
+        parser.add_argument('name', type=str, help="Name should be string", required=True)
+        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
+        parser.add_argument('date_of_quiz', type=str, help="Date of quiz should be string", required=False)
+        parser.add_argument('time_duration', type=int, help="Time duration should be integer", required=False)
+        parser.add_argument('remarks', type=str, help="Remarks should be string", required=False)
         args = parser.parse_args()
         quiz = Quiz.query.get(id)
         if not quiz:
             return {"message": "quiz not found"}, 404
-        for key, value in args.items():
-            setattr(quiz, key, value)
+        quiz.name = args.get('name')
+        quiz.chapter_id = args.get('chapter_id')
+
+        date_of_quiz_str = args.get('date_of_quiz')
+        if date_of_quiz_str:
+            try:
+                date_of_quiz = datetime.strptime(date_of_quiz_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+            except ValueError:
+                return {"message": "Invalid date format. Please use YYYY-MM-DDTHH:MM:SS.ffffffZ"}, 400
+        else:
+            date_of_quiz = None
+        quiz.date_of_quiz = date_of_quiz
+
+        quiz.time_duration = args.get('time_duration')
+        quiz.remarks = args.get('remarks')
         db.session.commit()
         return {"message": "quiz updated"}
 
@@ -264,7 +302,7 @@ class ChapterResource(Resource):
         chapter.name = args['name']
         chapter.subject_id = subject.id
         if 'description' in args:
-            chapter.description = args['description']
+            chapter.description = args.get('description')
         db.session.commit()
         return chapter
 
