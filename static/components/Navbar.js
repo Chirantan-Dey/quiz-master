@@ -5,7 +5,7 @@ const Navbar = {
         <div class="d-flex align-items-center">
           <router-link :to="getHomeLink" class="navbar-brand px-3 mb-0">Home</router-link>
           <span class="text-light">|</span>
-          <router-link :to="getQuizLink" class="navbar-brand px-3 mb-0">Quiz</router-link>
+          <router-link :to="getQuizLink" class="navbar-brand px-3 mb-0">{{ isAdmin ? 'Quiz' : 'Score' }}</router-link>
           <span class="text-light">|</span>
           <router-link :to="getSummaryLink" class="navbar-brand px-3 mb-0">Summary</router-link>
         </div>
@@ -49,14 +49,17 @@ const Navbar = {
     };
   },
   computed: {
+    isAdmin() {
+      return this.$store.state.user && this.$store.state.user.roles.length === 1 && this.$store.state.user.roles[0].name === 'admin';
+    },
     getHomeLink() {
-      return this.$store.state.user && this.$store.state.user.roles.length === 1 && this.$store.state.user.roles[0].name === 'admin' ? '/home-admin' : '/home-user';
+      return this.isAdmin ? '/home-admin' : '/home-user';
     },
     getQuizLink() {
-      return this.$store.state.user && this.$store.state.user.roles.length === 1 && this.$store.state.user.roles[0].name === 'admin' ? '/quiz-admin' : '/quiz-user';
+      return this.isAdmin ? '/quiz-admin' : '/score-user';
     },
     getSummaryLink() {
-      return this.$store.state.user && this.$store.state.user.roles.length === 1 && this.$store.state.user.roles[0].name === 'admin' ? '/summary-admin' : '/summary-user';
+      return this.isAdmin ? '/summary-admin' : '/summary-user';
     },
     showSearch() {
       // Don't show search on login/signup pages
@@ -67,12 +70,17 @@ const Navbar = {
     },
     searchPlaceholder() {
       const path = this.$route.path;
-      if (path.includes('home')) {
-        return 'Search subjects and chapters...';
-      } else if (path.includes('quiz')) {
-        return 'Search quizzes...';
-      } else if (path.includes('summary')) {
-        return 'Search results...';
+      const placeholders = {
+        'home': 'Search subjects and chapters...',
+        'quiz': 'Search quizzes...',
+        'score': 'Search scores...',
+        'summary': 'Search results...'
+      };
+      
+      for (const [key, value] of Object.entries(placeholders)) {
+        if (path.includes(key)) {
+          return value;
+        }
       }
       return 'Search...';
     }

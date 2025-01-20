@@ -2,11 +2,11 @@ import Login from "../pages/Login.js";
 import HomeAdmin from "../pages/HomeAdmin.js";
 import HomeUser from "../pages/HomeUser.js";
 import QuizAdmin from "../pages/QuizAdmin.js";
-import QuizUser from "../pages/QuizUser.js";
 import Signup from "../pages/Signup.js";
 import Logout from "../pages/Logout.js";
 import SummaryAdmin from "../pages/SummaryAdmin.js";
 import SummaryUser from "../pages/SummaryUser.js";
+import ScoreUser from "../pages/ScoreUser.js";
 
 const routes = [
   {
@@ -30,10 +30,6 @@ const routes = [
     component: QuizAdmin,
   },
   {
-    path: "/quiz-user",
-    component: QuizUser,
-  },
-  {
     path: "/register",
     component: Signup,
   },
@@ -48,6 +44,10 @@ const routes = [
   {
     path: "/summary-user",
     component: SummaryUser,
+  },
+  {
+    path: "/score-user",
+    component: ScoreUser,
   },
 ];
 
