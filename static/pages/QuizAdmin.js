@@ -120,7 +120,7 @@ const QuizAdmin = {
                             <option v-for="chapter in chapters" :key="chapter.id" :value="chapter.id">{{ chapter.name }}</option>
                         </select><br>
                         <input type="date" class="form-control" v-model="dateOfQuiz" placeholder="Date of Quiz"><br>
-                        <input type="number" class="form-control" v-model="timeDuration" placeholder="Time Duration"><br>
+                        <input type="number" class="form-control" v-model="timeDuration" placeholder="Time Duration(in minutes)"><br>
                         <input type="text" class="form-control" v-model="remarks" placeholder="Remarks">
                     </div>
                     <div class="modal-footer">
