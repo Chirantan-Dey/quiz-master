@@ -170,6 +170,13 @@ const QuizAdmin = {
         this.fetchChapters();
     },
     methods: {
+        resetQuizForm() {
+            this.quizName = '';
+            this.chapterId = '';
+            this.dateOfQuiz = '';
+            this.timeDuration = '';
+            this.remarks = '';
+        },
         async fetchQuizzes() {
             try {
                 const response = await fetch('/api/quizzes', {
@@ -328,12 +335,12 @@ const QuizAdmin = {
         },
         openAddQuizModal() {
             this.isQuizModalActive = true;
-            this.quizName = '';
+            this.resetQuizForm();
             $('#addQuizModal').modal('show');
         },
         closeQuizModal() {
             this.isQuizModalActive = false;
-            this.quizName = '';
+            this.resetQuizForm();
             $('#addQuizModal').modal('hide');
         },
         async saveQuiz() {
@@ -353,7 +360,7 @@ const QuizAdmin = {
                         remarks: this.remarks
                     }),
                 });
-                this.fetchQuizzes();
+                await this.fetchQuizzes();
                 this.closeQuizModal();
             } catch (error) {
                 console.error('Error saving quiz:', error);
