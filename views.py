@@ -53,7 +53,19 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
             chapters = db.session.query(Chapter).filter(Chapter.subject_id == subject.id).all()
             chapter_list = []
             for chapter in chapters:
-                chapter_list.append({ 'id': chapter.id, 'name': chapter.name, 'description': chapter.description })
+                # Get all quizzes for this chapter
+                total_questions = 0
+                quizzes = db.session.query(Quiz).filter(Quiz.chapter_id == chapter.id).all()
+                for quiz in quizzes:
+                    question_count = db.session.query(Questions).filter(Questions.quiz_id == quiz.id).count()
+                    total_questions += question_count
+
+                chapter_list.append({
+                    'id': chapter.id,
+                    'name': chapter.name,
+                    'description': chapter.description,
+                    'question_count': total_questions
+                })
             subject_list.append({ 'name': subject.name, 'chapters': chapter_list })
         return jsonify(subject_list)
 

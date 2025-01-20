@@ -11,6 +11,7 @@ const HomeAdmin = {
                         <tr>
                             <th>Chapter Name</th>
                             <th>Description</th>
+                            <th>Number of Questions</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -18,6 +19,7 @@ const HomeAdmin = {
                         <tr v-for="chapter in subject.chapters" :key="chapter.id">
                             <td>{{ chapter.name }}</td>
                             <td>{{ chapter.description }}</td>
+                            <td>{{ chapter.question_count }}</td>
                             <td>
                                 <button class="btn btn-sm btn-primary mr-2" @click="openEditChapterModal(chapter)">Edit</button>
                                 <button class="btn btn-sm btn-danger" @click="handleDeleteChapter(chapter.id)">Delete</button>
