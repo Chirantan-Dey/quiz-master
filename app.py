@@ -16,7 +16,6 @@ def create_app():
     app.config['SECURITY_PASSWORD_SALT'] = '9RrPTYTgV4c-iFafQeB7RQ'
     app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'] = 'Authentication-Token'
     
-
     # tell flask to use sql_alchemy db
     db.init_app(app)
 
@@ -29,7 +28,6 @@ def create_app():
         
         db.create_all()
         create_initial_data.create_data(user_datastore)
-
         
     # enable CSRF protection
     app.config["WTF_CSRF_CHECK_DEFAULT"] = True
@@ -44,13 +42,49 @@ def create_app():
 
     @app.route('/', methods=['POST'])
     def login():
-        data = request.get_json()
-        user = user_datastore.find_user(email=data['email'])
-        if user and verify_password(data['password'], user.password):
+        try:
+            data = request.get_json()
+            
+            # Check if required fields are present
+            if not data or 'email' not in data or 'password' not in data:
+                return jsonify({
+                    'message': 'Email and password are required'
+                }), 400
+
+            user = user_datastore.find_user(email=data['email'])
+            
+            if not user:
+                return jsonify({
+                    'message': 'Invalid credentials'
+                }), 401
+
+            if not user.active:
+                return jsonify({
+                    'message': 'Account is not active. Please wait for admin approval.'
+                }), 401
+
+            if not verify_password(data['password'], user.password):
+                return jsonify({
+                    'message': 'Invalid credentials'
+                }), 401
+
+            # Successful login
             login_user(user)
             auth_token = user.get_auth_token()
-            return jsonify({'access_token': auth_token, 'user': {'id': user.id, 'email': user.email, 'roles': [{'name': role.name} for role in user.roles]}}), 200
-        return jsonify({'message': 'Invalid credentials'}), 401
+            return jsonify({
+                'access_token': auth_token,
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'roles': [{'name': role.name} for role in user.roles]
+                }
+            }), 200
+
+        except Exception as e:
+            app.logger.error(f"Login error: {str(e)}")
+            return jsonify({
+                'message': 'An unexpected error occurred. Please try again later.'
+            }), 500
 
     return app
 

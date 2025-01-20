@@ -5,46 +5,80 @@ from flask_security.utils import hash_password
 from models import Subject, Chapter, Quiz, Questions
 from sqlalchemy import or_
 
-def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, db ):
-
+def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db):
     # homepage
     @app.route('/')
     def home():
-        return render_template('index.html') # entry point to vue frontend
+        return render_template('index.html')
 
-    
     @app.route('/register', methods=['POST'])
     def register():
+        try:
+            data = request.get_json()
+            
+            # Check if required fields are present
+            if not data or not all(k in data for k in ('email', 'password', 'role')):
+                return jsonify({'message': 'Email, password, and role are required'}), 400
 
-        data = request.get_json()
-        
-        email = data.get('email')
-        password = data.get('password')
-        role = data.get('role')
- 
+            email = data.get('email')
+            password = data.get('password')
+            role = data.get('role')
 
-        if not email or not password or not role:
-            return jsonify({'message' : 'invalid input'}), 403
+            # Check if user already exists
+            if user_datastore.find_user(email=email):
+                return jsonify({'message': 'An account with this email already exists'}), 400
 
-        if user_datastore.find_user(email = email ):
-            return jsonify({'message' : 'user already exists'}), 400
-        
-        if role == 'inst':
-            user = user_datastore.create_user(email = email, password = hash_password(password), active = False, roles = ['inst'])
-            db.session.commit()
-            return jsonify({'message' : 'Instructor succesfully created, waiting for admin approval', 'user': {'email': user.email, 'roles': [{'name': 'inst'}]}}), 201
-        
-        elif role == 'stud':
-            try :
-                user = user_datastore.create_user(email = email, password = hash_password(password), active = True, roles=['stud'])
-                db.session.commit()
-            except:
-                print('error while creating')
-            return jsonify({'message' : 'Student successfully created', 'user': {'email': user.email, 'roles': [{'name': 'stud'}]}})
-        
-        return jsonify({'message' : 'invalid role'}), 400
+            # Validate role
+            if role not in ['inst', 'stud']:
+                return jsonify({'message': 'Invalid role specified'}), 400
 
-   
+            try:
+                # Create user based on role
+                if role == 'inst':
+                    user = user_datastore.create_user(
+                        email=email,
+                        password=hash_password(password),
+                        active=False,
+                        roles=['inst']
+                    )
+                    db.session.commit()
+                    return jsonify({
+                        'message': 'Instructor account created successfully. Please wait for admin approval.',
+                        'user': {
+                            'email': user.email,
+                            'roles': [{'name': 'inst'}]
+                        }
+                    }), 201
+
+                else:  # role == 'stud'
+                    user = user_datastore.create_user(
+                        email=email,
+                        password=hash_password(password),
+                        active=True,
+                        roles=['stud']
+                    )
+                    db.session.commit()
+                    return jsonify({
+                        'message': 'Student account created successfully',
+                        'user': {
+                            'email': user.email,
+                            'roles': [{'name': 'stud'}]
+                        }
+                    }), 201
+
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Database error during user creation: {str(e)}")
+                return jsonify({
+                    'message': 'Failed to create account. Please try again later.'
+                }), 500
+
+        except Exception as e:
+            app.logger.error(f"Registration error: {str(e)}")
+            return jsonify({
+                'message': 'An unexpected error occurred. Please try again later.'
+            }), 500
+
     @app.route('/api/subjects')
     @auth_required('token', 'session')
     def get_subjects():
@@ -58,14 +92,12 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
             chapter_list = []
             
             for chapter in chapters:
-                # Get all quizzes for this chapter
                 total_questions = 0
                 quizzes = db.session.query(Quiz).filter(Quiz.chapter_id == chapter.id).all()
                 for quiz in quizzes:
                     question_count = db.session.query(Questions).filter(Questions.quiz_id == quiz.id).count()
                     total_questions += question_count
 
-                # Only add chapters that match search query
                 if not search_query or \
                    search_query in chapter.name.lower() or \
                    (chapter.description and search_query in chapter.description.lower()):
@@ -76,7 +108,6 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
                         'question_count': total_questions
                     })
             
-            # Only add subjects that have matching chapters or match search query
             if chapter_list or not search_query or search_query in subject.name.lower():
                 subject_list.append({ 'name': subject.name, 'chapters': chapter_list })
                 
@@ -140,7 +171,14 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
         chapter = Chapter(name=name, description=description, subject_id=subject.id)
         db.session.add(chapter)
         db.session.commit()
-        return jsonify({'message': 'Chapter created successfully', 'chapter': {'id': chapter.id, 'name': chapter.name, 'description': chapter.description}}), 201
+        return jsonify({
+            'message': 'Chapter created successfully',
+            'chapter': {
+                'id': chapter.id,
+                'name': chapter.name,
+                'description': chapter.description
+            }
+        }), 201
 
     @app.route('/api/chapters/<int:chapter_id>', methods=['PUT'])
     @auth_required('token', 'session')
@@ -159,7 +197,14 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
         chapter.name = name
         chapter.description = description
         db.session.commit()
-        return jsonify({'message': 'Chapter updated successfully', 'chapter': {'id': chapter.id, 'name': chapter.name, 'description': chapter.description}})
+        return jsonify({
+            'message': 'Chapter updated successfully',
+            'chapter': {
+                'id': chapter.id,
+                'name': chapter.name,
+                'description': chapter.description
+            }
+        })
 
     @app.route('/api/chapters/<int:chapter_id>', methods=['DELETE'])
     @auth_required('token', 'session')

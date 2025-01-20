@@ -3,19 +3,49 @@ import router from "../utils/router.js";
 const Signup = {
   template: `
     <div class="d-flex justify-content-center align-items-center vh-100">
-      <div class="card shadow p-4 border rounded-3 ">
+      <div class="card shadow p-4 border rounded-3">
         <h3 class="card-title text-center mb-4">Sign Up</h3>
-        <div class="form-group mb-3">
-          <input v-model="email" type="email" class="form-control" placeholder="Email" required/>
-        </div>
-        <div class="form-group mb-3">
-          <input v-model="password" type="password" class="form-control" placeholder="Password" required/>
-        </div>
-        <div class="form-group mb-4">
-          <input v-model="confirmPassword" type="password" class="form-control" placeholder="Confirm Password" required/>
-        </div>
-        <button class="btn btn-primary w-100" @click="submitInfo">Submit</button>
-        <button class="btn btn-link w-100" @click="goToLogin">Login</button>
+        <form @submit.prevent="submitInfo">
+          <div class="form-group mb-3">
+            <input 
+              v-model="email" 
+              type="email" 
+              class="form-control" 
+              placeholder="Email" 
+              required
+            />
+          </div>
+          <div class="form-group mb-3">
+            <input 
+              v-model="password" 
+              type="password" 
+              class="form-control" 
+              placeholder="Password" 
+              required
+            />
+          </div>
+          <div class="form-group mb-4">
+            <input 
+              v-model="confirmPassword" 
+              type="password" 
+              class="form-control" 
+              placeholder="Confirm Password" 
+              required
+            />
+          </div>
+          <div v-if="error" class="alert alert-danger mb-3">
+            {{ error }}
+          </div>
+          <button 
+            type="submit" 
+            class="btn btn-primary w-100"
+            :disabled="isLoading"
+          >
+            <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+            {{ isLoading ? 'Creating Account...' : 'Sign Up' }}
+          </button>
+          <button type="button" class="btn btn-link w-100" @click="goToLogin">Login</button>
+        </form>
       </div>
     </div>
   `,
@@ -24,37 +54,53 @@ const Signup = {
       email: "",
       password: "",
       confirmPassword: "",
+      error: "",
+      isLoading: false
     };
   },
   methods: {
     async submitInfo() {
-      const origin = window.location.origin;
-      const url = `${origin}/register`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: this.email, password: this.password, role: 'stud' }),
-        credentials: "same-origin", // Include credentials (cookies) with the request
-      });
+      this.error = "";
+      
+      if (this.password !== this.confirmPassword) {
+        this.error = "Passwords do not match";
+        return;
+      }
 
-      if (res.ok) {
+      this.isLoading = true;
+      
+      try {
+        const res = await fetch("/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            email: this.email, 
+            password: this.password,
+            role: 'stud'
+          }),
+          credentials: "same-origin",
+        });
+
         const data = await res.json();
-        console.log(data);
-        console.log("User roles:", JSON.stringify(data.user.roles));
-        // Handle successful login, e.g., redirect or store token
-        this.$store.commit("setAuthToken", data.access_token);
-        this.$store.commit("setUser", data.user);
-        if (data.user.roles.some(role => role.name === 'admin')) {
-          router.push("/home-admin");
+
+        if (res.ok) {
+          this.$store.commit("setAuthToken", data.access_token);
+          this.$store.commit("setUser", data.user);
+          if (data.user.roles.some(role => role.name === 'admin')) {
+            router.push("/home-admin");
+          } else {
+            router.push("/home-user");
+          }
         } else {
-          router.push("/home-user");
+          this.error = data.message || "Registration failed. Please try again.";
         }
-      } else {
-        const errorData = await res.json();
-        console.error("Login failed:", errorData);
-        // Handle login error
+      } catch (error) {
+        this.error = "An error occurred. Please try again.";
+        console.error("Registration error:", error);
+      } finally {
+        this.isLoading = false;
       }
     },
     goToLogin() {
