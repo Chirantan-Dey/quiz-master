@@ -4,7 +4,10 @@ const HomeAdmin = {
     template: `
         <div class="container">
             <h1>Admin Home</h1>
-            <div v-for="subject in subjects" :key="subject.name" class="mb-4">
+            <div v-if="filteredSubjects.length === 0" class="alert alert-info">
+                No matches found
+            </div>
+            <div v-for="subject in filteredSubjects" :key="subject.name" class="mb-4">
                 <h2>{{ subject.name }}</h2>
                 <table class="table">
                     <thead>
@@ -86,6 +89,32 @@ const HomeAdmin = {
             selectedSubjectName: '',
         };
     },
+    computed: {
+        filteredSubjects() {
+            const query = this.$store.state.search.query.toLowerCase();
+            if (!query) return this.subjects;
+            
+            return this.subjects.map(subject => {
+                // Check if subject matches
+                const subjectMatches = subject.name.toLowerCase().includes(query);
+                
+                // Filter chapters
+                const filteredChapters = subject.chapters.filter(chapter => 
+                    chapter.name.toLowerCase().includes(query) ||
+                    (chapter.description && chapter.description.toLowerCase().includes(query))
+                );
+                
+                // Keep subject if it matches or has matching chapters
+                if (subjectMatches || filteredChapters.length > 0) {
+                    return {
+                        ...subject,
+                        chapters: filteredChapters
+                    };
+                }
+                return null;
+            }).filter(Boolean); // Remove null subjects
+        }
+    },
     mounted() {
         this.fetchSubjects();
     },
@@ -111,13 +140,11 @@ const HomeAdmin = {
             document.body.classList.add('modal-open');
         },
         openAddChapterModal(subjectName) {
-            console.log('openAddChapterModal called');
             this.editingChapter = null;
             this.chapterName = '';
             this.chapterDescription = '';
             this.selectedSubjectName = subjectName;
             this.isChapterModalActive = true;
-            console.log('isChapterModalActive:', this.isChapterModalActive);
             document.body.classList.add('modal-open');
         },
         closeChapterModal() {
@@ -135,7 +162,6 @@ const HomeAdmin = {
             document.body.classList.remove('modal-open');
         },
         async saveChapter() {
-            console.log('saveChapter called');
             try {
                 const chapterData = {
                     name: this.chapterName,

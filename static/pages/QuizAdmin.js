@@ -8,7 +8,10 @@ const QuizAdmin = {
     template: `
     <div class="container">
         <h1>Quiz Admin</h1>
-        <div v-for="quiz in quizzes" :key="quiz.name" class="mb-4">
+        <div v-if="filteredQuizzes.length === 0" class="alert alert-info">
+            No matches found
+        </div>
+        <div v-for="quiz in filteredQuizzes" :key="quiz.name" class="mb-4">
             <h2>{{ quiz.name }}</h2>
             <table class="table">
                 <thead>
@@ -151,6 +154,17 @@ const QuizAdmin = {
             chapters: [],
         };
     },
+    computed: {
+        filteredQuizzes() {
+            const query = this.$store.state.search.query.toLowerCase();
+            if (!query) return this.quizzes;
+            
+            return this.quizzes.filter(quiz => 
+                quiz.name.toLowerCase().includes(query) ||
+                (quiz.remarks && quiz.remarks.toLowerCase().includes(query))
+            );
+        }
+    },
     mounted() {
         this.fetchQuizzes();
         this.fetchChapters();
@@ -205,7 +219,6 @@ const QuizAdmin = {
             this.isQuestionModalActive = true;
             $('#questionModal').modal('show');
         },
-
         closeQuestionModal() {
             this.isQuestionModalActive = false;
             this.editingQuestion = null;
@@ -314,7 +327,6 @@ const QuizAdmin = {
             }
         },
         openAddQuizModal() {
-            console.log('openAddQuizModal called');
             this.isQuizModalActive = true;
             this.quizName = '';
             $('#addQuizModal').modal('show');
@@ -323,7 +335,6 @@ const QuizAdmin = {
             this.isQuizModalActive = false;
             this.quizName = '';
             $('#addQuizModal').modal('hide');
-
         },
         async saveQuiz() {
             try {

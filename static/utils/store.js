@@ -3,6 +3,9 @@ const store = new Vuex.Store({
     authToken: localStorage.getItem("authToken") || "",
     test: "to test vuex working",
     user: JSON.parse(localStorage.getItem("user")) || null,
+    search: {
+      query: ""
+    }
   },
   mutations: {
     setAuthToken(state, token) {
@@ -19,13 +22,22 @@ const store = new Vuex.Store({
       localStorage.removeItem("user");
       state.user = null;
     },
+    setSearchQuery(state, query) {
+      state.search.query = query;
+    }
   },
   actions: {
-    // Actions to fetch user data, handle authentication, etc.
+    search({ commit }, query) {
+      commit('setSearchQuery', query);
+    },
+    clearSearch({ commit }) {
+      commit('setSearchQuery', '');
+    }
   },
   getters: {
     isLoggedIn: (state) => !!state.authToken,
     userRoles: (state) => state.user?.roles || [],
+    searchQuery: (state) => state.search.query
   },
 });
 

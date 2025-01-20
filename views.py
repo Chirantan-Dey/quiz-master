@@ -3,6 +3,7 @@ from flask_security import auth_required, current_user, roles_required
 from flask_security import SQLAlchemySessionUserDatastore
 from flask_security.utils import hash_password
 from models import Subject, Chapter, Quiz, Questions
+from sqlalchemy import or_
 
 def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, db ):
 
@@ -47,11 +48,15 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
     @app.route('/api/subjects')
     @auth_required('token', 'session')
     def get_subjects():
+        search_query = request.args.get('search', '').lower()
+        
         subjects = db.session.query(Subject).all()
         subject_list = []
+        
         for subject in subjects:
             chapters = db.session.query(Chapter).filter(Chapter.subject_id == subject.id).all()
             chapter_list = []
+            
             for chapter in chapters:
                 # Get all quizzes for this chapter
                 total_questions = 0
@@ -60,20 +65,41 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
                     question_count = db.session.query(Questions).filter(Questions.quiz_id == quiz.id).count()
                     total_questions += question_count
 
-                chapter_list.append({
-                    'id': chapter.id,
-                    'name': chapter.name,
-                    'description': chapter.description,
-                    'question_count': total_questions
-                })
-            subject_list.append({ 'name': subject.name, 'chapters': chapter_list })
+                # Only add chapters that match search query
+                if not search_query or \
+                   search_query in chapter.name.lower() or \
+                   (chapter.description and search_query in chapter.description.lower()):
+                    chapter_list.append({
+                        'id': chapter.id,
+                        'name': chapter.name,
+                        'description': chapter.description,
+                        'question_count': total_questions
+                    })
+            
+            # Only add subjects that have matching chapters or match search query
+            if chapter_list or not search_query or search_query in subject.name.lower():
+                subject_list.append({ 'name': subject.name, 'chapters': chapter_list })
+                
         return jsonify(subject_list)
 
     @app.route('/api/quizzes')
     @auth_required('token', 'session')
     def get_quizzes():
-        quizzes = db.session.query(Quiz).all()
+        search_query = request.args.get('search', '').lower()
+        
+        quizzes = db.session.query(Quiz)
+        
+        if search_query:
+            quizzes = quizzes.filter(
+                or_(
+                    Quiz.name.ilike(f'%{search_query}%'),
+                    Quiz.remarks.ilike(f'%{search_query}%')
+                )
+            )
+            
+        quizzes = quizzes.all()
         quiz_list = []
+        
         for quiz in quizzes:
             questions = db.session.query(Questions).filter(Questions.quiz_id == quiz.id).all()
             question_list = []
