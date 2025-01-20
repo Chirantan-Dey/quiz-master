@@ -1,6 +1,10 @@
 import store from '../utils/store.js';
+import Question from '../components/Question.js';
 
 const QuizAdmin = {
+    components: {
+        Question
+    },
     template: `
     <div class="container">
         <h1>Quiz Admin</h1>
@@ -9,18 +13,23 @@ const QuizAdmin = {
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Question Text</th>
-                        <th>Action</th>
+                        <th>ID</th>
+                        <th>Question Statement</th>
+                        <th>Option 1</th>
+                        <th>Option 2</th>
+                        <th>Correct Answer</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="question in quiz.questions" :key="question.id">
-                        <td>{{ question.text }}</td>
-                        <td>
-                            <button class="btn btn-sm btn-primary mr-2" @click="openEditQuestionModal(question)">Edit</button>
-                            <button class="btn btn-sm btn-danger" @click="handleDeleteQuestion(question.id)">Delete</button>
-                        </td>
-                    </tr>
+                    <Question
+                        v-for="question in quiz.questions"
+                        :key="question.id"
+                        :question="question"
+                        :isAdmin="true"
+                        @edit="openEditQuestionModal"
+                        @delete="handleDeleteQuestion"
+                    />
                     <tr>
                         <td colspan="2">
                             <button class="btn btn-sm btn-success" @click="openAddQuestionModal(quiz)">Add Question</button>
@@ -42,7 +51,48 @@ const QuizAdmin = {
                         </button>
                     </div>
                     <div class="modal-body">
-                        <input type="text" class="form-control" v-model="questionText" placeholder="Question Text">
+                        <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
+                        <div class="form-group mb-3">
+                            <label>Question Statement</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                v-model="questionData.question_statement"
+                                placeholder="Enter question statement"
+                                maxlength="500"
+                            >
+                            <small class="text-muted">Maximum 500 characters</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Option 1</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                v-model="questionData.option1"
+                                placeholder="Enter option 1"
+                                maxlength="200"
+                            >
+                            <small class="text-muted">Maximum 200 characters</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Option 2</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                v-model="questionData.option2"
+                                placeholder="Enter option 2"
+                                maxlength="200"
+                            >
+                            <small class="text-muted">Maximum 200 characters</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Correct Answer</label>
+                            <select class="form-control" v-model="questionData.correct_answer">
+                                <option value="">Select correct answer</option>
+                                <option v-if="questionData.option1" :value="questionData.option1">{{ questionData.option1 }}</option>
+                                <option v-if="questionData.option2" :value="questionData.option2">{{ questionData.option2 }}</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -85,7 +135,13 @@ const QuizAdmin = {
             isQuestionModalActive: false,
             isQuizModalActive: false,
             editingQuestion: null,
-            questionText: '',
+            questionData: {
+                question_statement: '',
+                option1: '',
+                option2: '',
+                correct_answer: ''
+            },
+            formError: '',
             quizName: '',
             selectedQuizId: null,
             chapterId: '',
@@ -128,13 +184,23 @@ const QuizAdmin = {
         },
         openEditQuestionModal(question) {
             this.editingQuestion = question;
-            this.questionText = question.text;
+            this.questionData = {
+                question_statement: question.question_statement,
+                option1: question.option1,
+                option2: question.option2,
+                correct_answer: question.correct_answer
+            };
             this.isQuestionModalActive = true;
             $('#questionModal').modal('show');
         },
         openAddQuestionModal(quiz) {
             this.editingQuestion = null;
-            this.questionText = '';
+            this.questionData = {
+                question_statement: '',
+                option1: '',
+                option2: '',
+                correct_answer: ''
+            };
             this.selectedQuizId = quiz.id;
             this.isQuestionModalActive = true;
             $('#questionModal').modal('show');
@@ -143,46 +209,108 @@ const QuizAdmin = {
         closeQuestionModal() {
             this.isQuestionModalActive = false;
             this.editingQuestion = null;
-            this.questionText = '';
+            this.questionData = {
+                question_statement: '',
+                option1: '',
+                option2: '',
+                correct_answer: ''
+            };
+            this.formError = '';
             $('#questionModal').modal('hide');
+        },
+        validateQuestionData() {
+            if (!this.questionData.question_statement.trim()) {
+                this.formError = 'Question statement is required';
+                return false;
+            }
+            if (!this.questionData.option1.trim()) {
+                this.formError = 'Option 1 is required';
+                return false;
+            }
+            if (!this.questionData.option2.trim()) {
+                this.formError = 'Option 2 is required';
+                return false;
+            }
+            if (!this.questionData.correct_answer) {
+                this.formError = 'Please select the correct answer';
+                return false;
+            }
+            if (this.questionData.question_statement.length > 500) {
+                this.formError = 'Question statement must be less than 500 characters';
+                return false;
+            }
+            if (this.questionData.option1.length > 200 || this.questionData.option2.length > 200) {
+                this.formError = 'Options must be less than 200 characters';
+                return false;
+            }
+            this.formError = '';
+            return true;
         },
         async saveQuestion() {
             try {
+                if (!this.validateQuestionData()) {
+                    return;
+                }
+
                 const headers = {
                     'Content-Type': 'application/json',
                     'Authentication-Token': store.state.authToken
                 };
-                const body = JSON.stringify({text: this.questionText});
+                
+                const payload = {
+                    ...this.questionData,
+                    quiz_id: parseInt(this.selectedQuizId)
+                };
+
+                let response;
                 if (this.editingQuestion) {
-                    await fetch(`/api/questions/${this.editingQuestion.id}`, {
+                    response = await fetch(`/api/questions/${this.editingQuestion.id}`, {
                         method: 'PUT',
                         headers,
-                        body,
+                        body: JSON.stringify(payload)
                     });
                 } else {
-                    await fetch('/api/questions', {
+                    response = await fetch('/api/questions', {
                         method: 'POST',
                         headers,
-                        body: JSON.stringify({text: this.questionText, quiz_id: this.selectedQuizId}),
+                        body: JSON.stringify(payload)
                     });
                 }
-                this.fetchQuizzes();
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.message || 'Failed to save question');
+                }
+                
+                await this.fetchQuizzes();
                 this.closeQuestionModal();
             } catch (error) {
                 console.error('Error saving question:', error);
+                this.formError = error.message || 'Failed to save question. Please try again.';
             }
         },
         async handleDeleteQuestion(questionId) {
             try {
-                await fetch(`/api/questions/${questionId}`, {
+                if (!confirm('Are you sure you want to delete this question? This action cannot be undone.')) {
+                    return;
+                }
+
+                const response = await fetch(`/api/questions/${questionId}`, {
                     method: 'DELETE',
                     headers: {
                         'Authentication-Token': store.state.authToken
                     }
                 });
-                this.fetchQuizzes();
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.message || 'Failed to delete question');
+                }
+
+                await this.fetchQuizzes();
             } catch (error) {
                 console.error('Error deleting question:', error);
+                alert('Failed to delete question: ' + (error.message || 'Please try again'));
             }
         },
         openAddQuizModal() {

@@ -66,8 +66,22 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
             questions = db.session.query(Questions).filter(Questions.quiz_id == quiz.id).all()
             question_list = []
             for question in questions:
-                question_list.append({ 'id': question.id, 'text': question.text })
-            quiz_list.append({ 'name': quiz.name, 'questions': question_list })
+                question_list.append({
+                    'id': question.id,
+                    'question_statement': question.question_statement,
+                    'option1': question.option1,
+                    'option2': question.option2,
+                    'correct_answer': question.correct_answer
+                })
+            quiz_list.append({
+                'id': quiz.id,
+                'name': quiz.name,
+                'chapter_id': quiz.chapter_id,
+                'date_of_quiz': quiz.date_of_quiz.strftime('%Y-%m-%d') if quiz.date_of_quiz else None,
+                'time_duration': quiz.time_duration,
+                'remarks': quiz.remarks,
+                'questions': question_list
+            })
         return jsonify(quiz_list)
     
     @app.route('/api/chapters', methods=['POST'])

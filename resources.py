@@ -4,10 +4,7 @@ from flask_security import auth_required
 from datetime import datetime
 
 parser = reqparse.RequestParser()
-
-
 api = Api(prefix='/api')
-
 subject_fields = {
     'id': fields.Integer,
     'name': fields.String
@@ -25,7 +22,9 @@ quiz_fields = {
 question_fields = {
     'id': fields.Integer,
     'quiz_id': fields.Integer,
-    'text': fields.String,
+    'question_statement': fields.String,
+    'option1': fields.String,
+    'option2': fields.String,
     'correct_answer': fields.String
 }
 
@@ -181,10 +180,13 @@ class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
     def post(self):
-        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
-        parser.add_argument('text', type=str, help="Text should be string", required=True)
-        parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
-        args = parser.parse_args()
+        question_parser = reqparse.RequestParser()
+        question_parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
+        question_parser.add_argument('question_statement', type=str, help="Question statement should be string", required=True)
+        question_parser.add_argument('option1', type=str, help="Option 1 should be string", required=True)
+        question_parser.add_argument('option2', type=str, help="Option 2 should be string", required=True)
+        question_parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
+        args = question_parser.parse_args()
         question = Questions(**args)
         db.session.add(question)
         db.session.commit()
@@ -193,10 +195,13 @@ class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
     def put(self, id):
-        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
-        parser.add_argument('text', type=str, help="Text should be string", required=True)
-        parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
-        args = parser.parse_args()
+        question_parser = reqparse.RequestParser()
+        question_parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
+        question_parser.add_argument('question_statement', type=str, help="Question statement should be string", required=True)
+        question_parser.add_argument('option1', type=str, help="Option 1 should be string", required=True)
+        question_parser.add_argument('option2', type=str, help="Option 2 should be string", required=True)
+        question_parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
+        args = question_parser.parse_args()
         question = Questions.query.get(id)
         if not question:
             return {"message": "question not found"}, 404
