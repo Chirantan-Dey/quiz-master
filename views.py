@@ -4,6 +4,7 @@ from flask_security import SQLAlchemySessionUserDatastore
 from flask_security.utils import hash_password
 from models import Subject, Chapter, Quiz, Questions
 from sqlalchemy import or_
+from datetime import datetime
 
 def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db):
     # homepage
@@ -17,55 +18,52 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
             data = request.get_json()
             
             # Check if required fields are present
-            if not data or not all(k in data for k in ('email', 'password', 'role')):
-                return jsonify({'message': 'Email, password, and role are required'}), 400
+            required_fields = ['email', 'password', 'role', 'full_name', 'qualification', 'dob']
+            if not data or not all(k in data for k in required_fields):
+                return jsonify({'message': 'All fields (email, password, role, full name, qualification, and date of birth) are required'}), 400
 
             email = data.get('email')
             password = data.get('password')
             role = data.get('role')
+            full_name = data.get('full_name')
+            qualification = data.get('qualification')
+            dob = data.get('dob')
 
             # Check if user already exists
             if user_datastore.find_user(email=email):
                 return jsonify({'message': 'An account with this email already exists'}), 400
 
-            # Validate role
-            if role not in ['inst', 'stud']:
-                return jsonify({'message': 'Invalid role specified'}), 400
+            # Validate role - only allow 'user' role for registration
+            if role != 'user':
+                return jsonify({'message': 'Invalid role. Only user registration is allowed'}), 400
 
             try:
-                # Create user based on role
-                if role == 'inst':
-                    user = user_datastore.create_user(
-                        email=email,
-                        password=hash_password(password),
-                        active=False,
-                        roles=['inst']
-                    )
-                    db.session.commit()
-                    return jsonify({
-                        'message': 'Instructor account created successfully. Please wait for admin approval.',
-                        'user': {
-                            'email': user.email,
-                            'roles': [{'name': 'inst'}]
-                        }
-                    }), 201
+                # Parse date of birth
+                dob_date = datetime.strptime(dob, '%Y-%m-%d').date()
+                
+                # Create user with 'user' role
+                user = user_datastore.create_user(
+                    email=email,
+                    password=hash_password(password),
+                    active=True,
+                    roles=['user'],
+                    full_name=full_name,
+                    qualification=qualification,
+                    dob=dob_date
+                )
+                db.session.commit()
+                return jsonify({
+                    'message': 'User account created successfully',
+                    'user': {
+                        'email': user.email,
+                        'roles': [{'name': 'user'}]
+                    }
+                }), 201
 
-                else:  # role == 'stud'
-                    user = user_datastore.create_user(
-                        email=email,
-                        password=hash_password(password),
-                        active=True,
-                        roles=['stud']
-                    )
-                    db.session.commit()
-                    return jsonify({
-                        'message': 'Student account created successfully',
-                        'user': {
-                            'email': user.email,
-                            'roles': [{'name': 'stud'}]
-                        }
-                    }), 201
-
+            except ValueError as e:
+                return jsonify({
+                    'message': 'Invalid date format. Please use YYYY-MM-DD format.'
+                }), 400
             except Exception as e:
                 db.session.rollback()
                 app.logger.error(f"Database error during user creation: {str(e)}")

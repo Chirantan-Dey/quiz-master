@@ -17,6 +17,32 @@ const Signup = {
           </div>
           <div class="form-group mb-3">
             <input 
+              v-model="fullName" 
+              type="text" 
+              class="form-control" 
+              placeholder="Full Name" 
+              required
+            />
+          </div>
+          <div class="form-group mb-3">
+            <input 
+              v-model="qualification" 
+              type="text" 
+              class="form-control" 
+              placeholder="Qualification" 
+              required
+            />
+          </div>
+          <div class="form-group mb-3">
+            <input 
+              v-model="dob" 
+              type="date" 
+              class="form-control" 
+              required
+            />
+          </div>
+          <div class="form-group mb-3">
+            <input 
               v-model="password" 
               type="password" 
               class="form-control" 
@@ -52,6 +78,9 @@ const Signup = {
   data() {
     return {
       email: "",
+      fullName: "",
+      qualification: "",
+      dob: "",
       password: "",
       confirmPassword: "",
       error: "",
@@ -76,9 +105,12 @@ const Signup = {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ 
-            email: this.email, 
+            email: this.email,
+            full_name: this.fullName,
+            qualification: this.qualification,
+            dob: this.dob,
             password: this.password,
-            role: 'stud'
+            role: 'user'
           }),
           credentials: "same-origin",
         });
