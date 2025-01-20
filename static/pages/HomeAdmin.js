@@ -24,7 +24,7 @@ const HomeAdmin = {
                             <td>{{ chapter.description }}</td>
                             <td>{{ chapter.question_count }}</td>
                             <td>
-                                <button class="btn btn-sm btn-primary mr-2" @click="openEditChapterModal(chapter)">Edit</button>
+                                <button class="btn btn-sm btn-primary me-2" @click="openEditChapterModal(chapter)">Edit</button>
                                 <button class="btn btn-sm btn-danger" @click="handleDeleteChapter(chapter.id)">Delete</button>
                             </td>
                         </tr>
@@ -38,13 +38,13 @@ const HomeAdmin = {
             </div>
             <button class="btn btn-primary" @click="openAddSubjectModal">Add Subject</button>
 
-            <div class="modal" :class="{ 'show d-block': isChapterModalActive }">
+            <div class="modal fade" id="chapterModal" tabindex="-1" aria-labelledby="chapterModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title" v-if="editingChapter">Edit Chapter</h5>
-                            <h5 class="modal-title" v-else>Add Chapter</h5>
-                            <button type="button" class="close" @click="closeChapterModal" data-dismiss="modal"> &times; </button>
+                            <h5 class="modal-title" id="chapterModalLabel" v-if="editingChapter">Edit Chapter</h5>
+                            <h5 class="modal-title" id="chapterModalLabel" v-else>Add Chapter</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
                             <input type="text" class="form-control mb-2" v-model="chapterName" placeholder="Chapter Name">
@@ -52,25 +52,25 @@ const HomeAdmin = {
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-primary" @click="saveChapter">Save</button>
-                            <button type="button" class="btn btn-secondary" @click="closeChapterModal">Cancel</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="modal" :class="{ 'show d-block': isSubjectModalActive }" style="background-color: rgba(0, 0, 0, 0.5);">
+            <div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Add Subject</h5>
-                            <button type="button" class="close" @click="closeSubjectModal" data-dismiss="modal"> &times; </button>
+                            <h5 class="modal-title" id="subjectModalLabel">Add Subject</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
                             <input type="text" class="form-control mb-2" v-model="subjectName" placeholder="Subject Name">
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-primary" @click="saveSubject">Save</button>
-                            <button type="button" class="btn btn-secondary" @click="closeSubjectModal">Cancel</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -87,6 +87,8 @@ const HomeAdmin = {
             subjectName: '',
             subjectDescription: '',
             selectedSubjectName: '',
+            chapterModal: null,
+            subjectModal: null
         };
     },
     computed: {
@@ -117,6 +119,8 @@ const HomeAdmin = {
     },
     mounted() {
         this.fetchSubjects();
+        this.chapterModal = new bootstrap.Modal(document.getElementById('chapterModal'));
+        this.subjectModal = new bootstrap.Modal(document.getElementById('subjectModal'));
     },
     methods: {
         async fetchSubjects() {
@@ -137,7 +141,7 @@ const HomeAdmin = {
             this.chapterName = chapter.name;
             this.chapterDescription = chapter.description;
             this.isChapterModalActive = true;
-            document.body.classList.add('modal-open');
+            this.chapterModal.show();
         },
         openAddChapterModal(subjectName) {
             this.editingChapter = null;
@@ -145,21 +149,21 @@ const HomeAdmin = {
             this.chapterDescription = '';
             this.selectedSubjectName = subjectName;
             this.isChapterModalActive = true;
-            document.body.classList.add('modal-open');
+            this.chapterModal.show();
         },
         closeChapterModal() {
             this.isChapterModalActive = false;
-            document.body.classList.remove('modal-open');
+            this.chapterModal.hide();
         },
         openAddSubjectModal() {
             this.subjectName = '';
             this.subjectDescription = '';
             this.isSubjectModalActive = true;
-            document.body.classList.add('modal-open');
+            this.subjectModal.show();
         },
         closeSubjectModal() {
             this.isSubjectModalActive = false;
-            document.body.classList.remove('modal-open');
+            this.subjectModal.hide();
         },
         async saveChapter() {
             try {

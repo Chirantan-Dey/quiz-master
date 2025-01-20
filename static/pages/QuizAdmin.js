@@ -43,15 +43,13 @@ const QuizAdmin = {
         </div>
         <button class="btn btn-primary" @click="openAddQuizModal">Add Quiz</button>
 
-        <div class="modal fade" id="questionModal" tabindex="-1" role="dialog" aria-labelledby="questionModalLabel" aria-hidden="true">
-            <div class="modal-dialog" role="document">
+        <div class="modal fade" id="questionModal" tabindex="-1" aria-labelledby="questionModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="questionModalLabel" v-if="editingQuestion">Edit Question</h5>
                         <h5 class="modal-title" id="questionModalLabel" v-else>Add Question</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
@@ -98,21 +96,19 @@ const QuizAdmin = {
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" class="btn btn-primary" @click="saveQuestion">Save</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="modal fade" id="addQuizModal" tabindex="-1" role="dialog" aria-labelledby="addQuizModalLabel" aria-hidden="true">
-            <div class="modal-dialog" role="document">
+        <div class="modal fade" id="addQuizModal" tabindex="-1" aria-labelledby="addQuizModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addQuizModalLabel">Add Quiz</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <input type="text" class="form-control" v-model="quizName" placeholder="Quiz Name"><br>
@@ -124,7 +120,7 @@ const QuizAdmin = {
                         <input type="text" class="form-control" v-model="remarks" placeholder="Remarks">
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" class="btn btn-primary" @click="saveQuiz">Save</button>
                     </div>
                 </div>
@@ -152,6 +148,8 @@ const QuizAdmin = {
             timeDuration: '',
             remarks: '',
             chapters: [],
+            questionModal: null,
+            quizModal: null
         };
     },
     computed: {
@@ -168,6 +166,8 @@ const QuizAdmin = {
     mounted() {
         this.fetchQuizzes();
         this.fetchChapters();
+        this.questionModal = new bootstrap.Modal(document.getElementById('questionModal'));
+        this.quizModal = new bootstrap.Modal(document.getElementById('addQuizModal'));
     },
     methods: {
         resetQuizForm() {
@@ -212,7 +212,7 @@ const QuizAdmin = {
                 correct_answer: question.correct_answer
             };
             this.isQuestionModalActive = true;
-            $('#questionModal').modal('show');
+            this.questionModal.show();
         },
         openAddQuestionModal(quiz) {
             this.editingQuestion = null;
@@ -224,7 +224,7 @@ const QuizAdmin = {
             };
             this.selectedQuizId = quiz.id;
             this.isQuestionModalActive = true;
-            $('#questionModal').modal('show');
+            this.questionModal.show();
         },
         closeQuestionModal() {
             this.isQuestionModalActive = false;
@@ -236,7 +236,7 @@ const QuizAdmin = {
                 correct_answer: ''
             };
             this.formError = '';
-            $('#questionModal').modal('hide');
+            this.questionModal.hide();
         },
         validateQuestionData() {
             if (!this.questionData.question_statement.trim()) {
@@ -336,12 +336,12 @@ const QuizAdmin = {
         openAddQuizModal() {
             this.isQuizModalActive = true;
             this.resetQuizForm();
-            $('#addQuizModal').modal('show');
+            this.quizModal.show();
         },
         closeQuizModal() {
             this.isQuizModalActive = false;
             this.resetQuizForm();
-            $('#addQuizModal').modal('hide');
+            this.quizModal.hide();
         },
         async saveQuiz() {
             try {
