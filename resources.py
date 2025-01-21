@@ -1,10 +1,11 @@
 from flask_restful import Resource, Api, reqparse, marshal_with, fields
 from models import Subject, Quiz, Questions, Scores, Chapter, db
-from flask_security import auth_required
+from flask_security import auth_required, current_user
 from datetime import datetime
 
 parser = reqparse.RequestParser()
 api = Api(prefix='/api')
+
 subject_fields = {
     'id': fields.Integer,
     'name': fields.String
@@ -30,9 +31,10 @@ question_fields = {
 
 score_fields = {
     'id': fields.Integer,
-    'student_id': fields.Integer,
+    'user_id': fields.Integer,
     'quiz_id': fields.Integer,
-    'score': fields.Integer
+    'time_stamp_of_attempt': fields.DateTime,
+    'total_scored': fields.Integer
 }
 
 chapter_fields = {
@@ -174,8 +176,14 @@ class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
     def get(self):
-        all_questions = Questions.query.all()
-        return all_questions
+        parser.add_argument('quiz_id', type=int, location='args', required=False)
+        args = parser.parse_args()
+        
+        if args.get('quiz_id'):
+            questions = Questions.query.filter_by(quiz_id=args['quiz_id']).all()
+        else:
+            questions = Questions.query.all()
+        return questions
 
     @auth_required('token', 'session')
     @marshal_with(question_fields)
@@ -230,29 +238,39 @@ class ScoreResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(score_fields)
     def post(self):
-        parser.add_argument('student_id', type=int, help="Student ID should be integer", required=True)
-        parser.add_argument('score', type=int, help="Score should be integer", required=True)
-        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
+        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
+        parser.add_argument('total_scored', type=int, help="Total scored should be integer", required=True)
+        parser.add_argument('time_stamp_of_attempt', type=str, help="Timestamp should be string", required=True)
         args = parser.parse_args()
-        score = Scores(**args)
+        
+        try:
+            time_stamp = datetime.fromisoformat(args['time_stamp_of_attempt'].replace('Z', '+00:00'))
+        except ValueError:
+            return {"message": "Invalid timestamp format"}, 400
+        
+        score = Scores(
+            quiz_id=args['quiz_id'],
+            user_id=current_user.id,
+            time_stamp_of_attempt=time_stamp,
+            total_scored=args['total_scored']
+        )
         db.session.add(score)
         db.session.commit()
-        return {"message": "score created"}
+        return score
     
     @auth_required('token', 'session')
     @marshal_with(score_fields)
     def put(self, id):
-        parser.add_argument('student_id', type=int, help="Student ID should be integer", required=True)
-        parser.add_argument('score', type=int, help="Score should be integer", required=True)
-        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
+        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
+        parser.add_argument('total_scored', type=int, help="Total scored should be integer", required=True)
         args = parser.parse_args()
         score = Scores.query.get(id)
         if not score:
             return {"message": "score not found"}, 404
-        for key, value in args.items():
-            setattr(score, key, value)
+        score.quiz_id = args['quiz_id']
+        score.total_scored = args['total_scored']
         db.session.commit()
-        return {"message": "score updated"}
+        return score
 
     @auth_required('token', 'session')
     @marshal_with(score_fields)
