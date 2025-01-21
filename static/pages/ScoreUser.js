@@ -12,13 +12,7 @@ const ScoreUser = {
       </div>
 
       <!-- Content -->
-      <div v-if="loading && !error" class="text-center">
-        <div class="spinner-border" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-      </div>
-      
-      <div v-else>
+      <div v-if="!loading || error">
         <div v-if="userScores.length === 0" class="alert alert-info">
           No scores found. Take some quizzes to see your scores here!
         </div>
@@ -49,7 +43,7 @@ const ScoreUser = {
                 <span v-if="quizzes[score.quiz_id]">
                   {{ quizzes[score.quiz_id].name || 'Quiz #' + score.quiz_id }}
                 </span>
-                <span v-else class="text-muted">Loading...</span>
+                <span v-else>Quiz #{{ score.quiz_id }}</span>
               </td>
               <td>{{ getQuestionCount(score.quiz_id) }}</td>
               <td>{{ formatDate(score.time_stamp_of_attempt) }}</td>

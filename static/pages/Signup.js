@@ -67,8 +67,7 @@ const Signup = {
             class="btn btn-primary w-100"
             :disabled="isLoading"
           >
-            <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
-            {{ isLoading ? 'Creating Account...' : 'Sign Up' }}
+            Sign Up
           </button>
           <button type="button" class="btn btn-link w-100" @click="goToLogin">Login</button>
         </form>
