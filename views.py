@@ -3,11 +3,12 @@ from flask_security import auth_required, current_user, roles_required
 from flask_security import SQLAlchemySessionUserDatastore
 from flask_security.utils import hash_password
 from models import Subject, Chapter, Quiz, Questions
+import charts
+import os
 from sqlalchemy import or_
 from datetime import datetime
 
 def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db):
-    # homepage
     @app.route('/')
     def home():
         return render_template('index.html')
@@ -16,8 +17,6 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
     def register():
         try:
             data = request.get_json()
-            
-            # Check if required fields are present
             required_fields = ['email', 'password', 'role', 'full_name', 'qualification', 'dob']
             if not data or not all(k in data for k in required_fields):
                 return jsonify({'message': 'All fields (email, password, role, full name, qualification, and date of birth) are required'}), 400
@@ -29,19 +28,14 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
             qualification = data.get('qualification')
             dob = data.get('dob')
 
-            # Check if user already exists
             if user_datastore.find_user(email=email):
                 return jsonify({'message': 'An account with this email already exists'}), 400
 
-            # Validate role - only allow 'user' role for registration
             if role != 'user':
                 return jsonify({'message': 'Invalid role. Only user registration is allowed'}), 400
 
             try:
-                # Parse date of birth
                 dob_date = datetime.strptime(dob, '%Y-%m-%d').date()
-                
-                # Create user with 'user' role
                 user = user_datastore.create_user(
                     email=email,
                     password=hash_password(password),
@@ -59,29 +53,20 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
                         'roles': [{'name': 'user'}]
                     }
                 }), 201
-
-            except ValueError as e:
-                return jsonify({
-                    'message': 'Invalid date format. Please use YYYY-MM-DD format.'
-                }), 400
+            except ValueError:
+                return jsonify({'message': 'Invalid date format. Please use YYYY-MM-DD format.'}), 400
             except Exception as e:
                 db.session.rollback()
                 app.logger.error(f"Database error during user creation: {str(e)}")
-                return jsonify({
-                    'message': 'Failed to create account. Please try again later.'
-                }), 500
-
+                return jsonify({'message': 'Failed to create account. Please try again later.'}), 500
         except Exception as e:
             app.logger.error(f"Registration error: {str(e)}")
-            return jsonify({
-                'message': 'An unexpected error occurred. Please try again later.'
-            }), 500
+            return jsonify({'message': 'An unexpected error occurred. Please try again later.'}), 500
 
     @app.route('/api/subjects')
     @auth_required('token', 'session')
     def get_subjects():
         search_query = request.args.get('search', '').lower()
-        
         subjects = db.session.query(Subject).all()
         subject_list = []
         
@@ -115,7 +100,6 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
     @auth_required('token', 'session')
     def get_quizzes():
         search_query = request.args.get('search', '').lower()
-        
         quizzes = db.session.query(Quiz)
         
         if search_query:
@@ -214,3 +198,52 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
         db.session.delete(chapter)
         db.session.commit()
         return jsonify({'message': 'Chapter deleted successfully'})
+
+    @app.route('/api/charts/admin')
+    @auth_required('token', 'session')
+    @roles_required('admin')
+    def get_admin_charts():
+        try:
+            # Clean up old charts first
+            charts.cleanup_charts()
+            
+            # Generate new charts
+            scores_chart = charts.generate_admin_subject_scores()
+            if not scores_chart:
+                return jsonify({'message': 'No score data available'}), 404
+                
+            attempts_chart = charts.generate_admin_subject_attempts()
+            if not attempts_chart:
+                return jsonify({'message': 'No attempt data available'}), 404
+            
+            return jsonify({
+                'scores_chart': f'/static/charts/admin/{scores_chart}',
+                'attempts_chart': f'/static/charts/admin/{attempts_chart}'
+            })
+        except Exception as e:
+            app.logger.error(f"Error generating admin charts: {str(e)}")
+            return jsonify({'message': 'Error generating charts'}), 500
+
+    @app.route('/api/charts/user')
+    @auth_required('token', 'session')
+    def get_user_charts():
+        try:
+            # Clean up old charts first
+            charts.cleanup_charts()
+            
+            # Generate new charts
+            questions_chart = charts.generate_user_subject_questions()
+            if not questions_chart:
+                return jsonify({'message': 'No questions data available'}), 404
+                
+            attempts_chart = charts.generate_user_subject_attempts()(current_user.id)
+            if not attempts_chart:
+                return jsonify({'message': 'No quiz attempts found'}), 404
+            
+            return jsonify({
+                'questions_chart': f'/static/charts/user/{questions_chart}',
+                'attempts_chart': f'/static/charts/user/{attempts_chart}'
+            })
+        except Exception as e:
+            app.logger.error(f"Error generating user charts: {str(e)}")
+            return jsonify({'message': 'Error generating charts'}), 500
