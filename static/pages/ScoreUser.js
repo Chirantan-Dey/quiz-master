@@ -1,12 +1,8 @@
 const ScoreUser = {
   template: `
     <div class="container mt-4">
-      <div class="d-flex justify-content-between align-items-center mb-4">
+      <div class="mb-4">
         <h2>Quiz Scores</h2>
-        <button class="btn btn-primary" @click="refreshData" :disabled="loading">
-          <span v-if="loading" class="spinner-border spinner-border-sm me-1" role="status"></span>
-          Refresh
-        </button>
       </div>
 
       <!-- Error Alert -->
@@ -57,11 +53,7 @@ const ScoreUser = {
               </td>
               <td>{{ getQuestionCount(score.quiz_id) }}</td>
               <td>{{ formatDate(score.time_stamp_of_attempt) }}</td>
-              <td>
-                <span :class="getScoreClass(score)">
-                  {{ score.total_scored }}/{{ getQuestionCount(score.quiz_id) }}
-                </span>
-              </td>
+              <td>{{ score.total_scored }}/{{ getQuestionCount(score.quiz_id) }}</td>
             </tr>
           </tbody>
         </table>
@@ -70,7 +62,7 @@ const ScoreUser = {
   `,
   data() {
     return {
-      loading: true,
+      loading: false,
       error: null,
       scores: [],
       quizzes: {},
@@ -150,14 +142,6 @@ const ScoreUser = {
       const quiz = this.quizzes[quizId];
       return quiz?.questions?.length || 'N/A';
     },
-    getScoreClass(score) {
-      const total = this.getQuestionCount(score.quiz_id);
-      if (total === 'N/A') return '';
-      const percentage = (score.total_scored / total) * 100;
-      if (percentage >= 75) return 'text-success';
-      if (percentage >= 50) return 'text-warning';
-      return 'text-danger';
-    },
     sort(field) {
       if (this.sortField === field) {
         this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -165,22 +149,19 @@ const ScoreUser = {
         this.sortField = field;
         this.sortDirection = 'desc';
       }
-    },
-    async refreshData() {
-      this.loading = true;
-      this.error = null;
-      try {
-        await Promise.all([
-          this.fetchScores(),
-          this.fetchQuizzes()
-        ]);
-      } finally {
-        this.loading = false;
-      }
     }
   },
   async mounted() {
-    await this.refreshData();
+    this.loading = true;
+    this.error = null;
+    try {
+      await Promise.all([
+        this.fetchScores(),
+        this.fetchQuizzes()
+      ]);
+    } finally {
+      this.loading = false;
+    }
   }
 };
 
