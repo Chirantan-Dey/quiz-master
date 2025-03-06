@@ -3,6 +3,7 @@ from flask_security import auth_required, current_user, roles_required
 from flask_security import SQLAlchemySessionUserDatastore
 from flask_security.utils import hash_password
 from models import Subject, Chapter, Quiz, Questions
+from extensions import cache
 import charts
 import os
 from sqlalchemy import or_
@@ -65,6 +66,7 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
 
     @app.route('/api/subjects')
     @auth_required('token', 'session')
+    @cache.memoize(timeout=3)  # Cache for 1 hour
     def get_subjects():
         search_query = request.args.get('search', '').lower()
         subjects = db.session.query(Subject).all()
@@ -98,6 +100,7 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
 
     @app.route('/api/quizzes')
     @auth_required('token', 'session')
+    @cache.memoize(timeout=1)  # Cache for 30 minutes
     def get_quizzes():
         search_query = request.args.get('search', '').lower()
         quizzes = db.session.query(Quiz)
@@ -153,6 +156,10 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
         chapter = Chapter(name=name, description=description, subject_id=subject.id)
         db.session.add(chapter)
         db.session.commit()
+        
+        # Invalidate subject cache after adding new chapter
+        cache.delete_memoized(get_subjects)
+        
         return jsonify({
             'message': 'Chapter created successfully',
             'chapter': {
@@ -179,6 +186,10 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
         chapter.name = name
         chapter.description = description
         db.session.commit()
+        
+        # Invalidate subject cache after updating chapter
+        cache.delete_memoized(get_subjects)
+        
         return jsonify({
             'message': 'Chapter updated successfully',
             'chapter': {
@@ -197,11 +208,16 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
         
         db.session.delete(chapter)
         db.session.commit()
+        
+        # Invalidate subject cache after deleting chapter
+        cache.delete_memoized(get_subjects)
+        
         return jsonify({'message': 'Chapter deleted successfully'})
 
     @app.route('/api/charts/admin')
     @auth_required('token', 'session')
     @roles_required('admin')
+    @cache.memoize(timeout=7)  # Cache for 2 hours
     def get_admin_charts():
         try:
             # Clean up old charts first
@@ -226,20 +242,23 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
 
     @app.route('/api/charts/user')
     @auth_required('token', 'session')
+    @cache.memoize(timeout=7)  # Cache for 2 hours
     def get_user_charts():
         try:
             # Clean up old charts first
             charts.cleanup_charts()
             
-            # Generate new charts
+            # Generate new charts with user_id for attempts
             questions_chart = charts.generate_user_subject_questions()
+            attempts_chart = charts.generate_user_subject_attempts(current_user.id)
+            
+            # Check chart generation results
             if not questions_chart:
                 return jsonify({'message': 'No questions data available'}), 404
-                
-            attempts_chart = charts.generate_user_subject_attempts()(current_user.id)
             if not attempts_chart:
                 return jsonify({'message': 'No quiz attempts found'}), 404
             
+            # Return chart paths
             return jsonify({
                 'questions_chart': f'/static/charts/user/{questions_chart}',
                 'attempts_chart': f'/static/charts/user/{attempts_chart}'

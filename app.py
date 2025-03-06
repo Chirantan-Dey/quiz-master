@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from extensions import db
+from extensions import db, cache
 import views
 import create_initial_data
 import resources
@@ -16,8 +16,14 @@ def create_app():
     app.config['SECURITY_PASSWORD_SALT'] = '9RrPTYTgV4c-iFafQeB7RQ'
     app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'] = 'Authentication-Token'
     
-    # tell flask to use sql_alchemy db
+    # Cache configuration
+    app.config['CACHE_TYPE'] = 'redis'
+    app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 3
+    
+    # Initialize extensions
     db.init_app(app)
+    cache.init_app(app)
 
     with app.app_context():
         from models import User, Role

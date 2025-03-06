@@ -2,6 +2,7 @@ from flask_restful import Resource, Api, reqparse, marshal_with, fields
 from models import Subject, Quiz, Questions, Scores, Chapter, db
 from flask_security import auth_required, current_user
 from datetime import datetime
+from extensions import cache
 
 parser = reqparse.RequestParser()
 api = Api(prefix='/api')
@@ -46,6 +47,7 @@ chapter_fields = {
 class SubjectResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(subject_fields)
+    @cache.cached(timeout=10, key_prefix='subject_list')  # Cache for 30 minutes
     def get(self):
         all_subjects = Subject.query.all()
         result = []
@@ -71,6 +73,7 @@ class SubjectResource(Resource):
         subject = Subject(name=args['name'], description=None)
         db.session.add(subject)
         db.session.commit()
+        cache.delete('subject_list')  # Invalidate cache
         return subject
     
     @auth_required('token', 'session')
@@ -84,6 +87,7 @@ class SubjectResource(Resource):
         subject.name = args['name']
         subject.description = None
         db.session.commit()
+        cache.delete('subject_list')  # Invalidate cache
         return subject
 
     @auth_required('token', 'session')
@@ -94,11 +98,13 @@ class SubjectResource(Resource):
             return {"message": "subject not found"}, 404
         db.session.delete(subject)
         db.session.commit()
+        cache.delete('subject_list')  # Invalidate cache
         return {"message": "subject deleted"}
 
 class QuizResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(quiz_fields)
+    @cache.cached(timeout=10, key_prefix='quiz_list')  # Cache for 30 minutes
     def get(self):
         all_quizzes = Quiz.query.all()
         return all_quizzes
@@ -130,6 +136,7 @@ class QuizResource(Resource):
         )
         db.session.add(quiz)
         db.session.commit()
+        cache.delete('quiz_list')  # Invalidate cache
         return quiz
     
     @auth_required('token', 'session')
@@ -160,6 +167,7 @@ class QuizResource(Resource):
         quiz.time_duration = args.get('time_duration')
         quiz.remarks = args.get('remarks')
         db.session.commit()
+        cache.delete('quiz_list')  # Invalidate cache
         return {"message": "quiz updated"}
 
     @auth_required('token', 'session')
@@ -170,11 +178,13 @@ class QuizResource(Resource):
             return {"message": "quiz not found"}, 404
         db.session.delete(quiz)
         db.session.commit()
+        cache.delete('quiz_list')  # Invalidate cache
         return {"message": "quiz deleted"}
 
 class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
+    @cache.memoize(timeout=1800)  # Cache for 30 minutes
     def get(self):
         parser.add_argument('quiz_id', type=int, location='args', required=False)
         args = parser.parse_args()
@@ -198,6 +208,7 @@ class QuestionResource(Resource):
         question = Questions(**args)
         db.session.add(question)
         db.session.commit()
+        cache.delete_memoized(self.get)  # Invalidate cache
         return {"message": "question created"}
     
     @auth_required('token', 'session')
@@ -216,6 +227,7 @@ class QuestionResource(Resource):
         for key, value in args.items():
             setattr(question, key, value)
         db.session.commit()
+        cache.delete_memoized(self.get)  # Invalidate cache
         return {"message": "question updated"}
 
     @auth_required('token', 'session')
@@ -226,14 +238,17 @@ class QuestionResource(Resource):
             return {"message": "question not found"}, 404
         db.session.delete(question)
         db.session.commit()
+        cache.delete_memoized(self.get)  # Invalidate cache
         return {"message": "question deleted"}
 
 class ScoreResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(score_fields)
+    @cache.memoize(timeout=1800)  # Cache for 30 minutes
     def get(self):
-        all_scores = Scores.query.all()
-        return all_scores
+        user_id = current_user.id
+        user_scores = Scores.query.filter_by(user_id=user_id).all()
+        return user_scores
 
     @auth_required('token', 'session')
     @marshal_with(score_fields)
@@ -256,6 +271,7 @@ class ScoreResource(Resource):
         )
         db.session.add(score)
         db.session.commit()
+        cache.delete_memoized(self.get)  # Invalidate user's score cache
         return score
     
     @auth_required('token', 'session')
@@ -270,6 +286,7 @@ class ScoreResource(Resource):
         score.quiz_id = args['quiz_id']
         score.total_scored = args['total_scored']
         db.session.commit()
+        cache.delete_memoized(self.get)  # Invalidate user's score cache
         return score
 
     @auth_required('token', 'session')
@@ -280,11 +297,13 @@ class ScoreResource(Resource):
             return {"message": "score not found"}, 404
         db.session.delete(score)
         db.session.commit()
+        cache.delete_memoized(self.get)  # Invalidate user's score cache
         return {"message": "score deleted"}
 
 class ChapterResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(chapter_fields)
+    @cache.cached(timeout=10, key_prefix='chapter_list')  # Cache for 30 minutes
     def get(self):
         all_chapters = Chapter.query.all()
         return all_chapters
@@ -304,6 +323,7 @@ class ChapterResource(Resource):
         chapter = Chapter(name=args['name'], subject_id=subject.id, description=args.get('description'))
         db.session.add(chapter)
         db.session.commit()
+        cache.delete('chapter_list')  # Invalidate cache
         return chapter
     
     @auth_required('token', 'session')
@@ -327,6 +347,7 @@ class ChapterResource(Resource):
         if 'description' in args:
             chapter.description = args.get('description')
         db.session.commit()
+        cache.delete('chapter_list')  # Invalidate cache
         return chapter
 
     @auth_required('token', 'session')
@@ -337,6 +358,7 @@ class ChapterResource(Resource):
             return {"message": "chapter not found"}, 404
         db.session.delete(chapter)
         db.session.commit()
+        cache.delete('chapter_list')  # Invalidate cache
         return {"message": "chapter deleted"}
 
 api.add_resource(SubjectResource, '/subjects', '/subjects/<int:id>')
