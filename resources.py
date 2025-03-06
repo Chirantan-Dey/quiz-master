@@ -47,7 +47,7 @@ chapter_fields = {
 class SubjectResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(subject_fields)
-    @cache.cached(timeout=10, key_prefix='subject_list')  # Cache for 30 minutes
+    @cache.cached(timeout=1, key_prefix='subject_list')  # Cache for 1 second
     def get(self):
         all_subjects = Subject.query.all()
         result = []
@@ -104,7 +104,7 @@ class SubjectResource(Resource):
 class QuizResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(quiz_fields)
-    @cache.cached(timeout=10, key_prefix='quiz_list')  # Cache for 30 minutes
+    @cache.cached(timeout=1, key_prefix='quiz_list')  # Cache for 1 second
     def get(self):
         all_quizzes = Quiz.query.all()
         return all_quizzes
@@ -184,7 +184,7 @@ class QuizResource(Resource):
 class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
-    @cache.memoize(timeout=1800)  # Cache for 30 minutes
+    @cache.memoize(timeout=1)  # Cache for 1 second
     def get(self):
         parser.add_argument('quiz_id', type=int, location='args', required=False)
         args = parser.parse_args()
@@ -244,7 +244,7 @@ class QuestionResource(Resource):
 class ScoreResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(score_fields)
-    @cache.memoize(timeout=1800)  # Cache for 30 minutes
+    @cache.memoize(timeout=1)  # Cache for 1 second
     def get(self):
         user_id = current_user.id
         user_scores = Scores.query.filter_by(user_id=user_id).all()
@@ -303,7 +303,7 @@ class ScoreResource(Resource):
 class ChapterResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(chapter_fields)
-    @cache.cached(timeout=10, key_prefix='chapter_list')  # Cache for 30 minutes
+    @cache.cached(timeout=1, key_prefix='chapter_list')  # Cache for 1 second
     def get(self):
         all_chapters = Chapter.query.all()
         return all_chapters

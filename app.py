@@ -19,7 +19,7 @@ def create_app():
     # Cache configuration
     app.config['CACHE_TYPE'] = 'redis'
     app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
-    app.config['CACHE_DEFAULT_TIMEOUT'] = 3
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 1
     
     # Initialize extensions
     db.init_app(app)

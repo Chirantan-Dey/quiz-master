@@ -1,128 +1,67 @@
-# Caching Implementation Plan for Quiz Master
+# Cache Duration Update Plan
 
-## Overview
+## Current State Analysis
 
-The Quiz Master application requires caching implementation to improve performance and reduce database load. This document outlines the caching strategy using Flask-Caching with Redis as the backend.
+### Cache Configuration Locations
+1. extensions.py (default configuration)
+   - CACHE_DEFAULT_TIMEOUT: Changed to 1 (was 3)
 
-## Cache Points Analysis
+2. app.py (application configuration)
+   - CACHE_DEFAULT_TIMEOUT = 3
 
-### View-level Endpoints
-- GET /api/subjects (Complex queries with nested data)
-- GET /api/quizzes (Heavy data load with questions)
-- GET /api/charts/admin (Chart generation is CPU intensive)
-- GET /api/charts/user (User-specific chart generation)
+3. views.py (specific endpoints)
+   - get_subjects(): timeout=3
+   - get_quizzes(): timeout=1
+   - get_admin_charts(): timeout=7
+   - get_user_charts(): timeout=7
 
-### Resource-level Endpoints
-- GET /api/subjects (SubjectResource)
-- GET /api/chapters (ChapterResource)
-- GET /api/questions (QuestionResource)
+4. resources.py (API resources)
+   - subject_list: timeout=10
+   - quiz_list: timeout=10
+   - chapter_list: timeout=10
+   - questions: timeout=1800
+   - scores: timeout=1800
 
-## Implementation Plan
+## Required Changes
 
-### 1. Cache Configuration
+### Phase 1: Update Default Configurations
+1. ✓ extensions.py: CACHE_DEFAULT_TIMEOUT = 1
+2. app.py: Update CACHE_DEFAULT_TIMEOUT to 1
 
-```python
-from flask_caching import Cache
-from datetime import timedelta
+### Phase 2: Standardize View Caching
+In views.py:
+1. Update get_subjects() to timeout=1
+2. get_quizzes() is already at timeout=1
+3. Update get_admin_charts() to timeout=1
+4. Update get_user_charts() to timeout=1
 
-cache = Cache(config={
-    'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_URL': 'redis://localhost:6379/0',
-    'CACHE_DEFAULT_TIMEOUT': 300  # 5 minutes default
-})
-```
+### Phase 3: Update Resource Caching
+In resources.py:
+1. Update subject_list cache to timeout=1
+2. Update quiz_list cache to timeout=1
+3. Update chapter_list cache to timeout=1
+4. Update questions cache to timeout=1
+5. Update scores cache to timeout=1
 
-### 2. Caching Strategies
+## Implementation Order
+1. ✓ Update extensions.py default timeout
+2. Update app.py configuration
+3. Update views.py timeouts
+4. Update resources.py timeouts
+5. Test each endpoint after updates
 
-#### A. View-Level Caching
+## Testing Plan
+1. Verify Redis server is running
+2. Test each endpoint to ensure cache invalidation works:
+   - Subject listing and operations
+   - Quiz listing and operations
+   - Question operations
+   - Score operations
+   - Admin and user charts
+3. Monitor application performance
+4. Verify data consistency across all endpoints
 
-```python
-# Subject list with nested data (1 hour cache)
-@cache.memoize(timeout=3600)
-def get_subjects():
-    # Existing complex query logic...
-
-# Quiz list with questions (30 minutes cache)
-@cache.memoize(timeout=1800)
-def get_quizzes():
-    # Existing quiz query logic...
-
-# Charts (2 hours cache, user-specific)
-@cache.memoize(timeout=7200)
-def get_admin_charts():
-    # Existing chart generation...
-
-@cache.memoize(timeout=7200)
-def get_user_charts(user_id):
-    # Existing user chart generation...
-```
-
-#### B. Resource-Level Caching
-
-```python
-class SubjectResource(Resource):
-    @cache.cached(timeout=1800, key_prefix='subject_list')
-    def get(self):
-        # Existing subject retrieval...
-
-class QuestionResource(Resource):
-    @cache.memoize(timeout=1800)
-    def get(self, quiz_id=None):
-        # Existing question retrieval...
-```
-
-#### C. Cache Invalidation Rules
-
-```python
-def invalidate_subject_cache():
-    cache.delete('subject_list')
-    cache.delete_memoized(get_subjects)
-
-def invalidate_quiz_cache():
-    cache.delete_memoized(get_quizzes)
-
-def invalidate_user_cache(user_id):
-    cache.delete_memoized(get_user_charts, user_id)
-```
-
-### 3. Implementation Priority
-
-1. Set up Redis and Flask-Caching configuration
-2. Implement view-level caching for most accessed endpoints
-3. Add resource-level caching for API endpoints
-4. Implement user-specific caching
-5. Add cache invalidation triggers
-
-### 4. Cache Key Strategy
-
-```python
-def generate_cache_key(*args, **kwargs):
-    key_parts = [str(arg) for arg in args]
-    key_parts.extend(f"{k}:{v}" for k, v in sorted(kwargs.items()))
-    return ":".join(key_parts)
-```
-
-## Rationale for Caching Decisions
-
-1. **View-Level Caching (1-2 hours)**
-   - Subject and quiz lists contain complex nested data
-   - Chart generation is CPU intensive
-   - User-specific data cached separately
-
-2. **Resource-Level Caching (30 minutes)**
-   - API endpoints have simpler data structures
-   - More frequent updates possible
-   - Shorter cache duration to maintain data freshness
-
-3. **Cache Invalidation**
-   - Immediate invalidation on data updates
-   - User-specific cache cleared on relevant updates
-   - Automatic expiration as backup
-
-## Next Steps
-
-1. Install and configure Redis
-2. Add Flask-Caching to the project
-3. Implement caching decorators
-4. Add cache invalidation triggers
-5. Monitor and adjust cache timeouts based on usage patterns
+## Notes
+- All caches will be standardized to 1 second timeout for consistency
+- Cache invalidation logic remains unchanged
+- May need to monitor system performance due to increased cache operations
