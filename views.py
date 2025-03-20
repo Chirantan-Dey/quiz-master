@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 from flask import render_template_string, render_template, Flask, request, jsonify
 from flask_security import auth_required, current_user, roles_required
 from flask_security import SQLAlchemySessionUserDatastore
@@ -10,8 +11,13 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
     @app.route('/')
     def home():
         return render_template('index.html') # entry point to vue frontend
+=======
+from flask import request, jsonify, render_template
+from flask_security import login_user, auth_required
+>>>>>>> Stashed changes
 
     
+<<<<<<< Updated upstream
     @app.route('/register', methods=['POST'])
     def register():
 
@@ -198,3 +204,10 @@ def create_views(app : Flask, user_datastore : SQLAlchemySessionUserDatastore, d
         return jsonify({'message': 'Quiz created successfully', 'quiz': {'id': quiz.id, 'name': quiz.name, 'chapter_id': quiz.chapter_id, 'date_of_quiz': quiz.date_of_quiz, 'time_duration': quiz.time_duration, 'remarks': quiz.remarks}}), 201
     
     return app
+=======
+    # Note: Main login route is in app.py as it's a core function
+    # This file is for additional views/routes
+    
+    # Add any additional views here...
+    pass
+>>>>>>> Stashed changes

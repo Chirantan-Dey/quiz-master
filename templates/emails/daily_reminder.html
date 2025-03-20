@@ -1,0 +1,40 @@
+{% extends "emails/base.html" %}
+
+{% block header %}
+<h1>Quiz Master Daily Update</h1>
+{% endblock %}
+
+{% block content %}
+<p>Hello {{ user.full_name }},</p>
+
+{% if not last_attempt or last_attempt.time_stamp_of_attempt.date() < yesterday %}
+<div class="card">
+    <h3>💡 Activity Reminder</h3>
+    <p>We noticed you haven't attempted any quizzes recently. Keep your knowledge sharp by taking regular quizzes!</p>
+</div>
+{% endif %}
+
+{% if new_quizzes %}
+<div class="card">
+    <h2>🎯 New Quizzes Available</h2>
+    {% for quiz in new_quizzes %}
+    <div class="card" style="margin: 10px 0;">
+        <h3>{{ quiz.name }}</h3>
+        <p><strong>📅 Date:</strong> {{ quiz.date_of_quiz.strftime('%B %d, %Y') }}</p>
+        <p><strong>⏱️ Duration:</strong> {{ quiz.time_duration }} minutes</p>
+        {% if quiz.remarks %}
+        <p><strong>📝 Remarks:</strong> {{ quiz.remarks }}</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="text-center">
+    <a href="http://localhost:5000" class="button">Visit Quiz Master</a>
+</div>
+
+<p class="text-muted text-center" style="margin-top: 20px;">
+    Stay curious and keep learning!
+</p>
+{% endblock %}

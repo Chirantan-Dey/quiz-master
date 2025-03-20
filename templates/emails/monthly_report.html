@@ -1,0 +1,69 @@
+{% extends "emails/base.html" %}
+
+{% block header %}
+<h1>Monthly Activity Report</h1>
+<h2>{{ month }}</h2>
+{% endblock %}
+
+{% block content %}
+<p>Hello {{ user.full_name }},</p>
+
+<p>Here's your learning journey for {{ month }}:</p>
+
+<div class="card">
+    <div class="text-center">
+        <h2>📊 Performance Overview</h2>
+        <div style="margin: 20px 0;">
+            <h3 style="color: var(--purple-color); font-size: 24px;">
+                🏆 Rank: {{ rank }}
+            </h3>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div class="card">
+                <h4>📝 Quizzes Taken</h4>
+                <p style="font-size: 20px; font-weight: bold;">{{ total_quizzes }}</p>
+            </div>
+            <div class="card">
+                <h4>⭐ Average Score</h4>
+                <p style="font-size: 20px; font-weight: bold;">{{ "%.1f"|format(avg_score) }}%</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if scores %}
+<div class="card" style="margin-top: 20px;">
+    <h2>📈 Quiz History</h2>
+    {% for score in scores %}
+    <div class="card" style="margin: 10px 0;">
+        <h3>{{ score.quiz.name }}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+                <p><strong>📅 Date:</strong></p>
+                <p>{{ score.time_stamp_of_attempt.strftime('%B %d, %Y') }}</p>
+            </div>
+            <div>
+                <p><strong>🎯 Score:</strong></p>
+                <p>{{ score.total_scored }}%</p>
+            </div>
+        </div>
+        {% if score.quiz.remarks %}
+        <p style="margin-top: 10px;">
+            <strong>📝 Remarks:</strong> {{ score.quiz.remarks }}
+        </p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top: 20px; text-align: center;">
+    <h3>🎯 Set Your Goals</h3>
+    <p>Want to improve your rank? Take more quizzes and aim for higher scores!</p>
+    <a href="http://localhost:5000" class="button" style="margin: 10px 0;">Take a Quiz Now</a>
+</div>
+
+<p class="text-muted text-center" style="margin-top: 20px;">
+    Remember: Consistent practice leads to better results. Keep up the great work!
+</p>
+{% endblock %}

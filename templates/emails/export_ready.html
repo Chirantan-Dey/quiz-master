@@ -1,0 +1,56 @@
+{% extends "emails/base.html" %}
+
+{% block header %}
+<h1>Quiz History Export</h1>
+<p style="margin-top: 10px;">Your data is ready!</p>
+{% endblock %}
+
+{% block content %}
+<p>Hello {{ user.full_name }},</p>
+
+<div class="card">
+    <h2>📊 Export Details</h2>
+    <p>Your quiz history export has been generated and is attached to this email.</p>
+    
+    <div class="card" style="margin: 20px 0;">
+        <h3>📄 File Contents</h3>
+        <ul style="list-style-type: none; padding: 0;">
+            <li>🔍 Quiz ID and Name</li>
+            <li>📚 Chapter ID</li>
+            <li>📅 Date of Quiz</li>
+            <li>⏱️ Attempt Timestamp</li>
+            <li>🎯 Scores</li>
+            <li>📝 Remarks</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📋 How to Use</h3>
+    <p>You can open this CSV file with:</p>
+    <ul style="list-style-type: none; padding: 0;">
+        <li>📊 Microsoft Excel</li>
+        <li>📈 Google Sheets</li>
+        <li>📑 LibreOffice Calc</li>
+        <li>📝 Any text editor</li>
+    </ul>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h3>🔒 Privacy Note</h3>
+    <p>This file contains your personal quiz data. We recommend:</p>
+    <ul style="list-style-type: none; padding: 0;">
+        <li>🔐 Store it securely</li>
+        <li>📱 Don't share it on social media</li>
+        <li>💾 Keep a backup if needed</li>
+    </ul>
+</div>
+
+<div class="text-center" style="margin-top: 20px;">
+    <a href="http://localhost:5000" class="button">Visit Quiz Master</a>
+</div>
+
+<p class="text-muted text-center" style="margin-top: 20px;">
+    Need help with the export? Contact our support team.
+</p>
+{% endblock %}

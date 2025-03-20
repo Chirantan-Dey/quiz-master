@@ -1,4 +1,4 @@
-import store from '../utils/store.js';
+import { api } from '../utils/api.js';
 import Question from '../components/Question.js';
 
 const QuizAdmin = {
@@ -97,6 +97,7 @@ const QuizAdmin = {
     `,
     data() {
         return {
+            loading: false,
             quizzes: [],
             isQuestionModalActive: false,
             isQuizModalActive: false,
@@ -121,25 +122,18 @@ const QuizAdmin = {
     methods: {
         async fetchQuizzes() {
             try {
-                const response = await fetch('/api/quizzes', {
-                    headers: {
-                        'Authentication-Token': store.state.authToken
-                    }
-                });
-                const data = await response.json();
+                this.loading = true;
+                const data = await api.get('/api/quizzes');
                 this.quizzes = data;
             } catch (error) {
                 console.error('Error fetching quizzes:', error);
+            } finally {
+                this.loading = false;
             }
         },
         async fetchChapters() {
             try {
-                const response = await fetch('/api/chapters', {
-                    headers: {
-                        'Authentication-Token': store.state.authToken
-                    }
-                });
-                const data = await response.json();
+                const data = await api.get('/api/chapters');
                 this.chapters = data;
             } catch (error) {
                 console.error('Error fetching chapters:', error);
@@ -167,6 +161,7 @@ const QuizAdmin = {
 
         closeQuestionModal() {
             this.isQuestionModalActive = false;
+<<<<<<< Updated upstream
             this.editingQuestion = null;
             this.questionText = '';
             this.option1 = '';
@@ -208,6 +203,56 @@ const QuizAdmin = {
                     });
                 }
                 this.fetchQuizzes();
+=======
+            this.questionModal.hide();
+        },
+        validateQuestionData() {
+            if (!this.questionData.question_statement.trim()) {
+                this.formError = 'Question statement is required';
+                return false;
+            }
+            if (!this.questionData.option1.trim()) {
+                this.formError = 'Option 1 is required';
+                return false;
+            }
+            if (!this.questionData.option2.trim()) {
+                this.formError = 'Option 2 is required';
+                return false;
+            }
+            if (!this.questionData.correct_answer) {
+                this.formError = 'Please select the correct answer';
+                return false;
+            }
+            if (this.questionData.question_statement.length > 500) {
+                this.formError = 'Question statement must be less than 500 characters';
+                return false;
+            }
+            if (this.questionData.option1.length > 200 || this.questionData.option2.length > 200) {
+                this.formError = 'Options must be less than 200 characters';
+                return false;
+            }
+            this.formError = '';
+            return true;
+        },
+        async saveQuestion() {
+            try {
+                if (!this.validateQuestionData()) {
+                    return;
+                }
+
+                const payload = {
+                    ...this.questionData,
+                    quiz_id: parseInt(this.selectedQuizId)
+                };
+
+                if (this.editingQuestion) {
+                    await api.put(`/api/questions/${this.editingQuestion.id}`, payload);
+                } else {
+                    await api.post('/api/questions', payload);
+                }
+
+                await this.fetchQuizzes();
+>>>>>>> Stashed changes
                 this.closeQuestionModal();
             } catch (error) {
                 console.error('Error saving question:', error);
@@ -215,6 +260,7 @@ const QuizAdmin = {
         },
         async handleDeleteQuestion(questionId) {
             try {
+<<<<<<< Updated upstream
                 await fetch(`/api/questions/${questionId}`, {
                     method: 'DELETE',
                     headers: {
@@ -222,6 +268,14 @@ const QuizAdmin = {
                     }
                 });
                 this.fetchQuizzes();
+=======
+                if (!confirm('Are you sure you want to delete this question? This action cannot be undone.')) {
+                    return;
+                }
+
+                await api.delete(`/api/questions/${questionId}`);
+                await this.fetchQuizzes();
+>>>>>>> Stashed changes
             } catch (error) {
                 console.error('Error deleting question:', error);
             }
@@ -241,19 +295,12 @@ const QuizAdmin = {
         async saveQuiz() {
             try {
                 const dateObject = new Date(this.dateOfQuiz);
-                await fetch('/api/quizzes', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authentication-Token': store.state.authToken
-                    },
-                    body: JSON.stringify({
-                        name: this.quizName,
-                        chapter_id: this.chapterId,
-                        date_of_quiz: dateObject,
-                        time_duration: this.timeDuration,
-                        remarks: this.remarks
-                    }),
+                await api.post('/api/quizzes', {
+                    name: this.quizName,
+                    chapter_id: this.chapterId,
+                    date_of_quiz: dateObject,
+                    time_duration: this.timeDuration,
+                    remarks: this.remarks
                 });
                 this.fetchQuizzes();
                 this.closeQuizModal();
@@ -261,7 +308,7 @@ const QuizAdmin = {
                 console.error('Error saving quiz:', error);
             }
         }
-    },
+    }
 };
 
 export default QuizAdmin;

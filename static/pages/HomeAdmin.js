@@ -1,4 +1,5 @@
 import store from '../utils/store.js';
+import { api } from '../utils/api.js';
 
 const HomeAdmin = {
     template: `
@@ -79,6 +80,7 @@ const HomeAdmin = {
             isSubjectModalActive: false,
             editingChapter: null,
             chapterName: '',
+            chapterDescription: '',
             subjectName: '',
             subjectDescription: '',
             selectedSubjectName: '',
@@ -90,12 +92,7 @@ const HomeAdmin = {
     methods: {
         async fetchSubjects() {
             try {
-                const response = await fetch('/api/subjects', {
-                    headers: {
-                        'Authentication-Token': store.state.authToken
-                    }
-                });
-                const data = await response.json();
+                const data = await api.get('/api/subjects');
                 this.subjects = data;
             } catch (error) {
                 console.error('Error fetching subjects:', error);
@@ -104,7 +101,7 @@ const HomeAdmin = {
         openEditChapterModal(chapter) {
             this.editingChapter = chapter;
             this.chapterName = chapter.name;
-            this.chapterDescription = chapter.description;
+            this.chapterDescription = chapter.description || '';
             this.isChapterModalActive = true;
             document.body.classList.add('modal-open');
         },
@@ -141,71 +138,36 @@ const HomeAdmin = {
                     subject_name: this.selectedSubjectName
                 };
 
-                const url = this.editingChapter
-                    ? `/api/chapters/${this.editingChapter.id}`
-                    : '/api/chapters';
-                const method = this.editingChapter ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authentication-Token': store.state.authToken
-                    },
-                    body: JSON.stringify(chapterData)
-                });
-
-                if (response.ok) {
-                    await this.fetchSubjects();
-                    this.closeChapterModal();
+                if (this.editingChapter) {
+                    await api.put(`/api/chapters/${this.editingChapter.id}`, chapterData);
                 } else {
-                    console.error('Failed to save chapter:', response.status, response.statusText, await response.json());
+                    await api.post('/api/chapters', chapterData);
                 }
 
+                await this.fetchSubjects();
+                this.closeChapterModal();
             } catch (error) {
                 console.error('Error saving chapter:', error);
             }
         },
         async handleDeleteChapter(chapterId) {
             try {
-                const response = await fetch(`/api/chapters/${chapterId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authentication-Token': store.state.authToken
-                    }
-                });
-                if (response.ok) {
-                    this.fetchSubjects();
-                } else {
-                    console.error('Failed to delete chapter:', response);
+                if (!confirm('Are you sure you want to delete this chapter?')) {
+                    return;
                 }
+                await api.delete(`/api/chapters/${chapterId}`);
+                await this.fetchSubjects();
             } catch (error) {
                 console.error('Error deleting chapter:', error);
             }
         },
         async saveSubject() {
             try {
-                const response = await fetch('/api/subjects', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authentication-Token': store.state.authToken
-                    },
-                    body: JSON.stringify({
-                        name: this.subjectName,
-                    })
+                await api.post('/api/subjects', {
+                    name: this.subjectName,
                 });
-
-                if (response.ok) {
-                    await this.fetchSubjects();
-                    this.closeSubjectModal();
-                } else {
-                    const errorData = await response.json();
-                    console.error('Failed to save subject:', response.status, response.statusText, errorData);
-                    if (errorData && errorData.message) {
-                        alert(errorData.message);
-                    }
-                }
+                await this.fetchSubjects();
+                this.closeSubjectModal();
             } catch (error) {
                 console.error('Error saving subject:', error);
             }

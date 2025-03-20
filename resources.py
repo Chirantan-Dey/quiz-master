@@ -1,5 +1,6 @@
 from flask_restful import Resource, Api, reqparse, marshal_with, fields
 from models import Subject, Quiz, Questions, Scores, Chapter, db
+<<<<<<< Updated upstream
 from flask_security import auth_required
 from datetime import datetime
 
@@ -8,6 +9,24 @@ parser = reqparse.RequestParser()
 
 api = Api(prefix='/api')
 
+=======
+from flask_security import auth_required, current_user
+from datetime import datetime
+from extensions import cache
+from flask import current_app, request
+from flask_wtf.csrf import generate_csrf
+
+api = Api(prefix='/api')
+
+# Request parsers with CSRF token handling
+def create_parser():
+    parser = reqparse.RequestParser()
+    return parser
+
+parser = create_parser()
+
+# Resource fields definitions
+>>>>>>> Stashed changes
 subject_fields = {
     'id': fields.Integer,
     'name': fields.String
@@ -231,6 +250,7 @@ class QuestionResource(Resource):
         db.session.commit()
         return {"message": "question deleted"}
 
+<<<<<<< Updated upstream
 class ScoreResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(score_fields)
@@ -332,8 +352,13 @@ class ChapterResource(Resource):
         db.session.commit()
         return {"message": "chapter deleted"}
 
+=======
+>>>>>>> Stashed changes
 api.add_resource(SubjectResource, '/subjects', '/subjects/<int:id>')
 api.add_resource(QuizResource, '/quizzes', '/quizzes/<int:id>')
 api.add_resource(QuestionResource, '/questions', '/questions/<int:id>')
+<<<<<<< Updated upstream
 api.add_resource(ScoreResource, '/scores', '/scores/<int:id>')
 api.add_resource(ChapterResource, '/chapters', '/chapters/<int:id>')
+=======
+>>>>>>> Stashed changes
