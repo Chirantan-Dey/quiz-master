@@ -1,12 +1,15 @@
 from flask_restful import Resource, Api, reqparse, marshal_with, fields
 from models import Subject, Quiz, Questions, Scores, Chapter, db
-from flask_security import auth_required, current_user
+from flask_security import auth_required, current_user, roles_required
 from datetime import datetime
 from extensions import cache
+from workers import generate_user_export
+from flask import current_app
 
 parser = reqparse.RequestParser()
 api = Api(prefix='/api')
 
+# Field definitions
 subject_fields = {
     'id': fields.Integer,
     'name': fields.String
@@ -47,7 +50,7 @@ chapter_fields = {
 class SubjectResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(subject_fields)
-    @cache.cached(timeout=1, key_prefix='subject_list')  # Cache for 1 second
+    @cache.cached(timeout=1, key_prefix='subject_list')
     def get(self):
         all_subjects = Subject.query.all()
         result = []
@@ -70,12 +73,12 @@ class SubjectResource(Resource):
     def post(self):
         parser.add_argument('name', type=str, help="Name should be string", required=True)
         args = parser.parse_args()
-        subject = Subject(name=args['name'], description=None)
+        subject = Subject(name=args['name'])
         db.session.add(subject)
         db.session.commit()
-        cache.delete('subject_list')  # Invalidate cache
+        cache.delete('subject_list')
         return subject
-    
+
     @auth_required('token', 'session')
     @marshal_with(subject_fields)
     def put(self, id):
@@ -85,9 +88,8 @@ class SubjectResource(Resource):
         if not subject:
             return {"message": "subject not found"}, 404
         subject.name = args['name']
-        subject.description = None
         db.session.commit()
-        cache.delete('subject_list')  # Invalidate cache
+        cache.delete('subject_list')
         return subject
 
     @auth_required('token', 'session')
@@ -98,32 +100,32 @@ class SubjectResource(Resource):
             return {"message": "subject not found"}, 404
         db.session.delete(subject)
         db.session.commit()
-        cache.delete('subject_list')  # Invalidate cache
+        cache.delete('subject_list')
         return {"message": "subject deleted"}
 
 class QuizResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(quiz_fields)
-    @cache.cached(timeout=1, key_prefix='quiz_list')  # Cache for 1 second
+    @cache.cached(timeout=1, key_prefix='quiz_list')
     def get(self):
-        all_quizzes = Quiz.query.all()
-        return all_quizzes
+        return Quiz.query.all()
 
     @auth_required('token', 'session')
     @marshal_with(quiz_fields)
     def post(self):
-        parser.add_argument('name', type=str, help="Name should be string", required=True)
-        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
-        parser.add_argument('date_of_quiz', type=str, help="Date of quiz should be string", required=False)
-        parser.add_argument('time_duration', type=int, help="Time duration should be integer", required=False)
-        parser.add_argument('remarks', type=str, help="Remarks should be string", required=False)
+        parser.add_argument('name', type=str, required=True)
+        parser.add_argument('chapter_id', type=int, required=True)
+        parser.add_argument('date_of_quiz', type=str, required=False)
+        parser.add_argument('time_duration', type=int, required=False)
+        parser.add_argument('remarks', type=str, required=False)
         args = parser.parse_args()
+        
         date_of_quiz_str = args.get('date_of_quiz')
         if date_of_quiz_str:
             try:
                 date_of_quiz = datetime.strptime(date_of_quiz_str, "%Y-%m-%dT%H:%M:%S.%fZ")
             except ValueError:
-                return {"message": "Invalid date format. Please use YYYY-MM-DDTHH:MM:SS.ffffffZ"}, 400
+                return {"message": "Invalid date format"}, 400
         else:
             date_of_quiz = None
 
@@ -136,126 +138,51 @@ class QuizResource(Resource):
         )
         db.session.add(quiz)
         db.session.commit()
-        cache.delete('quiz_list')  # Invalidate cache
+        cache.delete('quiz_list')
         return quiz
-    
-    @auth_required('token', 'session')
-    @marshal_with(quiz_fields)
-    def put(self, id):
-        parser.add_argument('name', type=str, help="Name should be string", required=True)
-        parser.add_argument('chapter_id', type=int, help="Chapter ID should be integer", required=True)
-        parser.add_argument('date_of_quiz', type=str, help="Date of quiz should be string", required=False)
-        parser.add_argument('time_duration', type=int, help="Time duration should be integer", required=False)
-        parser.add_argument('remarks', type=str, help="Remarks should be string", required=False)
-        args = parser.parse_args()
-        quiz = Quiz.query.get(id)
-        if not quiz:
-            return {"message": "quiz not found"}, 404
-        quiz.name = args.get('name')
-        quiz.chapter_id = args.get('chapter_id')
-
-        date_of_quiz_str = args.get('date_of_quiz')
-        if date_of_quiz_str:
-            try:
-                date_of_quiz = datetime.strptime(date_of_quiz_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-            except ValueError:
-                return {"message": "Invalid date format. Please use YYYY-MM-DDTHH:MM:SS.ffffffZ"}, 400
-        else:
-            date_of_quiz = None
-        quiz.date_of_quiz = date_of_quiz
-
-        quiz.time_duration = args.get('time_duration')
-        quiz.remarks = args.get('remarks')
-        db.session.commit()
-        cache.delete('quiz_list')  # Invalidate cache
-        return {"message": "quiz updated"}
-
-    @auth_required('token', 'session')
-    @marshal_with(quiz_fields)
-    def delete(self, id):
-        quiz = Quiz.query.get(id)
-        if not quiz:
-            return {"message": "quiz not found"}, 404
-        db.session.delete(quiz)
-        db.session.commit()
-        cache.delete('quiz_list')  # Invalidate cache
-        return {"message": "quiz deleted"}
 
 class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
-    @cache.memoize(timeout=1)  # Cache for 1 second
+    @cache.cached(timeout=1)
     def get(self):
         parser.add_argument('quiz_id', type=int, location='args', required=False)
         args = parser.parse_args()
         
         if args.get('quiz_id'):
-            questions = Questions.query.filter_by(quiz_id=args['quiz_id']).all()
-        else:
-            questions = Questions.query.all()
-        return questions
+            return Questions.query.filter_by(quiz_id=args['quiz_id']).all()
+        return Questions.query.all()
 
     @auth_required('token', 'session')
     @marshal_with(question_fields)
     def post(self):
-        question_parser = reqparse.RequestParser()
-        question_parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
-        question_parser.add_argument('question_statement', type=str, help="Question statement should be string", required=True)
-        question_parser.add_argument('option1', type=str, help="Option 1 should be string", required=True)
-        question_parser.add_argument('option2', type=str, help="Option 2 should be string", required=True)
-        question_parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
-        args = question_parser.parse_args()
+        parser.add_argument('quiz_id', type=int, required=True)
+        parser.add_argument('question_statement', type=str, required=True)
+        parser.add_argument('option1', type=str, required=True)
+        parser.add_argument('option2', type=str, required=True)
+        parser.add_argument('correct_answer', type=str, required=True)
+        args = parser.parse_args()
+
         question = Questions(**args)
         db.session.add(question)
         db.session.commit()
-        cache.delete_memoized(self.get)  # Invalidate cache
-        return {"message": "question created"}
-    
-    @auth_required('token', 'session')
-    @marshal_with(question_fields)
-    def put(self, id):
-        question_parser = reqparse.RequestParser()
-        question_parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
-        question_parser.add_argument('question_statement', type=str, help="Question statement should be string", required=True)
-        question_parser.add_argument('option1', type=str, help="Option 1 should be string", required=True)
-        question_parser.add_argument('option2', type=str, help="Option 2 should be string", required=True)
-        question_parser.add_argument('correct_answer', type=str, help="Correct answer should be string", required=True)
-        args = question_parser.parse_args()
-        question = Questions.query.get(id)
-        if not question:
-            return {"message": "question not found"}, 404
-        for key, value in args.items():
-            setattr(question, key, value)
-        db.session.commit()
-        cache.delete_memoized(self.get)  # Invalidate cache
-        return {"message": "question updated"}
-
-    @auth_required('token', 'session')
-    @marshal_with(question_fields)
-    def delete(self, id):
-        question = Questions.query.get(id)
-        if not question:
-            return {"message": "question not found"}, 404
-        db.session.delete(question)
-        db.session.commit()
-        cache.delete_memoized(self.get)  # Invalidate cache
-        return {"message": "question deleted"}
+        cache.delete_memoized(self.get)
+        return question
 
 class ScoreResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(score_fields)
-    @cache.memoize(timeout=1)  # Cache for 1 second
+    @cache.memoize(timeout=1)
     def get(self):
         user_id = current_user.id
-        user_scores = Scores.query.filter_by(user_id=user_id).all()
-        return user_scores
+        return Scores.query.filter_by(user_id=user_id).all()
 
     @auth_required('token', 'session')
     @marshal_with(score_fields)
     def post(self):
-        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
-        parser.add_argument('total_scored', type=int, help="Total scored should be integer", required=True)
-        parser.add_argument('time_stamp_of_attempt', type=str, help="Timestamp should be string", required=True)
+        parser.add_argument('quiz_id', type=int, required=True)
+        parser.add_argument('total_scored', type=int, required=True)
+        parser.add_argument('time_stamp_of_attempt', type=str, required=True)
         args = parser.parse_args()
         
         try:
@@ -271,98 +198,66 @@ class ScoreResource(Resource):
         )
         db.session.add(score)
         db.session.commit()
-        cache.delete_memoized(self.get)  # Invalidate user's score cache
+        cache.delete_memoized(self.get)
         return score
-    
-    @auth_required('token', 'session')
-    @marshal_with(score_fields)
-    def put(self, id):
-        parser.add_argument('quiz_id', type=int, help="Quiz ID should be integer", required=True)
-        parser.add_argument('total_scored', type=int, help="Total scored should be integer", required=True)
-        args = parser.parse_args()
-        score = Scores.query.get(id)
-        if not score:
-            return {"message": "score not found"}, 404
-        score.quiz_id = args['quiz_id']
-        score.total_scored = args['total_scored']
-        db.session.commit()
-        cache.delete_memoized(self.get)  # Invalidate user's score cache
-        return score
-
-    @auth_required('token', 'session')
-    @marshal_with(score_fields)
-    def delete(self, id):
-        score = Scores.query.get(id)
-        if not score:
-            return {"message": "score not found"}, 404
-        db.session.delete(score)
-        db.session.commit()
-        cache.delete_memoized(self.get)  # Invalidate user's score cache
-        return {"message": "score deleted"}
 
 class ChapterResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(chapter_fields)
-    @cache.cached(timeout=1, key_prefix='chapter_list')  # Cache for 1 second
+    @cache.cached(timeout=1, key_prefix='chapter_list')
     def get(self):
-        all_chapters = Chapter.query.all()
-        return all_chapters
+        return Chapter.query.all()
 
     @auth_required('token', 'session')
     @marshal_with(chapter_fields)
     def post(self):
-        parser.add_argument('name', type=str, help="Name should be string", required=True)
-        parser.add_argument('subject_name', type=str, help="Subject Name should be string", required=True)
-        parser.add_argument('description', type=str, help="Description should be string", required=False)
+        parser.add_argument('name', type=str, required=True)
+        parser.add_argument('subject_name', type=str, required=True)
+        parser.add_argument('description', type=str, required=False)
         args = parser.parse_args()
 
         subject = Subject.query.filter_by(name=args['subject_name']).first()
         if not subject:
             return {"message": "Subject not found"}, 404
 
-        chapter = Chapter(name=args['name'], subject_id=subject.id, description=args.get('description'))
+        chapter = Chapter(
+            name=args['name'],
+            subject_id=subject.id,
+            description=args.get('description')
+        )
         db.session.add(chapter)
         db.session.commit()
-        cache.delete('chapter_list')  # Invalidate cache
-        return chapter
-    
-    @auth_required('token', 'session')
-    @marshal_with(chapter_fields)
-    def put(self, id):
-        parser.add_argument('name', type=str, help="Name should be string", required=True)
-        parser.add_argument('subject_name', type=str, help="Subject Name should be string", required=True)
-        parser.add_argument('description', type=str, help="Description should be string", required=False)
-        args = parser.parse_args()
-
-        chapter = Chapter.query.get(id)
-        if not chapter:
-            return {"message": "chapter not found"}, 404
-        
-        subject = Subject.query.filter_by(name=args['subject_name']).first()
-        if not subject:
-            return {"message": "Subject not found"}, 404
-        
-        chapter.name = args['name']
-        chapter.subject_id = subject.id
-        if 'description' in args:
-            chapter.description = args.get('description')
-        db.session.commit()
-        cache.delete('chapter_list')  # Invalidate cache
+        cache.delete('chapter_list')
         return chapter
 
+class ExportResource(Resource):
     @auth_required('token', 'session')
-    @marshal_with(chapter_fields)
-    def delete(self, id):
-        chapter = Chapter.query.get(id)
-        if not chapter:
-            return {"message": "chapter not found"}, 404
-        db.session.delete(chapter)
-        db.session.commit()
-        cache.delete('chapter_list')  # Invalidate cache
-        return {"message": "chapter deleted"}
+    @roles_required('admin')
+    @cache.cached(timeout=1, key_prefix='export_task')
+    def post(self):
+        """Start a background task to export user data"""
+        try:
+            # Start the export task
+            task = generate_user_export.delay(current_user.email)
+            
+            # Clear the cache for this endpoint
+            cache.delete('export_task')
+            
+            return {
+                'message': 'Export started. You will receive an email when ready.',
+                'task_id': str(task.id)
+            }, 202
+            
+        except Exception as e:
+            current_app.logger.error(f"Export error: {str(e)}")
+            return {
+                'message': f'Export failed: {str(e)}'
+            }, 500
 
+# Add resources to API
 api.add_resource(SubjectResource, '/subjects', '/subjects/<int:id>')
 api.add_resource(QuizResource, '/quizzes', '/quizzes/<int:id>')
 api.add_resource(QuestionResource, '/questions', '/questions/<int:id>')
 api.add_resource(ScoreResource, '/scores', '/scores/<int:id>')
 api.add_resource(ChapterResource, '/chapters', '/chapters/<int:id>')
+api.add_resource(ExportResource, '/export/users')

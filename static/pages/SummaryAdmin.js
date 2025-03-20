@@ -2,9 +2,37 @@ const SummaryAdmin = {
   template: `
     <div class="container mt-4">
       <h1 class="text-center mb-4">Summary Admin</h1>
+
+      <!-- Export Section -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+              <h5 class="card-title mb-0">Data Management</h5>
+              <button 
+                class="btn btn-primary"
+                @click="exportUserData"
+                :disabled="isExporting"
+              >
+                {{ isExporting ? 'Exporting...' : 'Export User Data' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success Alert -->
+      <div v-if="exportSuccess" class="alert alert-success alert-dismissible fade show" role="alert">
+        Export started! You will receive an email when it's ready.
+        <button type="button" class="btn-close" @click="exportSuccess = false"></button>
+      </div>
+
+      <!-- Error Alert -->
       <div v-if="error" class="alert alert-danger text-center" role="alert">
         {{ error }}
       </div>
+
+      <!-- Charts Section -->
       <div class="row justify-content-center g-4" v-if="!error">
         <div class="col-12 col-md-6">
           <div class="card h-100">
@@ -42,8 +70,8 @@ const SummaryAdmin = {
         </div>
       </div>
 
-      <!-- Modal -->
-      <div class="modal fade" id="chartModal" tabindex="-1">
+      <!-- Chart Modal -->
+      <div class="modal fade" id="chartModalAdmin" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
           <div class="modal-content">
             <div class="modal-header">
@@ -92,13 +120,24 @@ const SummaryAdmin = {
       panY: 0,
       isPanning: false,
       lastX: 0,
-      lastY: 0
+      lastY: 0,
+      isExporting: false,
+      exportSuccess: false
+    }
+  },
+  computed: {
+    isAdmin() {
+      return this.$store.getters.userRoles.some(role => role.name === 'admin');
     }
   },
   methods: {
     async fetchCharts() {
       try {
-        const response = await fetch('/api/charts/admin')
+        const response = await fetch('/api/charts/admin', {
+          headers: {
+            'Authentication-Token': this.$store.state.authToken
+          }
+        })
         if (!response.ok) {
           throw new Error('Failed to fetch charts')
         }
@@ -109,6 +148,37 @@ const SummaryAdmin = {
       } catch (err) {
         console.error('Error fetching charts:', err)
         this.error = 'Error loading charts. Please try again later.'
+      }
+    },
+    async exportUserData() {
+      if (this.isExporting) return;
+      
+      this.isExporting = true;
+      this.error = null;
+      this.exportSuccess = false;
+      
+      try {
+        const response = await fetch('/api/export/users', {
+          method: 'POST',
+          headers: {
+            'Authentication-Token': this.$store.state.authToken
+          }
+        });
+        
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.message || 'Export failed');
+        }
+        
+        this.exportSuccess = true;
+        setTimeout(() => {
+          this.exportSuccess = false;
+        }, 5000);
+      } catch (error) {
+        console.error('Export error:', error);
+        this.error = error.message || 'Error starting export';
+      } finally {
+        this.isExporting = false;
       }
     },
     openModal(type) {
@@ -165,9 +235,15 @@ const SummaryAdmin = {
     }
   },
   mounted() {
-    this.fetchCharts()
-    this.modal = new bootstrap.Modal(document.getElementById('chartModal'))
+    // Redirect non-admin users
+    if (!this.isAdmin) {
+      this.$router.push('/home-user');
+      return;
+    }
+    
+    this.fetchCharts();
+    this.modal = new bootstrap.Modal(document.getElementById('chartModalAdmin'));
   }
 }
 
-export default SummaryAdmin
+export default SummaryAdmin;

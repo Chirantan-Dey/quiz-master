@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from extensions import db, cache
+from extensions import db, cache, mail
 import views
 import create_initial_data
 import resources
@@ -21,9 +21,17 @@ def create_app():
     app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
     app.config['CACHE_DEFAULT_TIMEOUT'] = 1
     
+    # Mail configuration (MailHog)
+    app.config['MAIL_SERVER'] = 'localhost'
+    app.config['MAIL_PORT'] = 1025  # MailHog SMTP port
+    app.config['MAIL_USE_TLS'] = False
+    app.config['MAIL_USE_SSL'] = False
+    app.config['MAIL_DEFAULT_SENDER'] = 'quiz-master@example.com'
+    
     # Initialize extensions
     db.init_app(app)
     cache.init_app(app)
+    mail.init_app(app)
 
     with app.app_context():
         from models import User, Role

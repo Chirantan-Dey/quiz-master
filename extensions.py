@@ -1,10 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import Security
 from flask_caching import Cache
+from flask_mail import Mail
 
 db = SQLAlchemy()
+mail = Mail()
 
-# Initialize cache with default config, will be updated in app.py
+# Initialize cache with Redis db 0
 cache = Cache(config={
     'CACHE_TYPE': 'redis',
     'CACHE_REDIS_URL': 'redis://localhost:6379/0',
