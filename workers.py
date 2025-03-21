@@ -9,50 +9,69 @@ import traceback
 import os
 import sys
 
-# Add current directory to Python path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+# Ensure app directory is in path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Initialize Celery
+# Create Celery instance without direct app dependency
 celery = Celery('quiz_master')
-celery.conf.update(
-    broker_url='redis://localhost:6379/1',
-    result_backend='redis://localhost:6379/1',  # Added result backend
-    timezone='Asia/Kolkata',
-    task_serializer='json',
-    accept_content=['json'],
-    result_serializer='json',
-    task_ignore_result=False,  # Enable result tracking
-    beat_schedule={
+
+# Default configuration
+class Config:
+    CELERY_BROKER_URL = 'redis://localhost:6379/1'
+    CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+    CELERY_TIMEZONE = 'Asia/Kolkata'
+    CELERY_TASK_SERIALIZER = 'json'
+    CELERY_ACCEPT_CONTENT = ['json']
+    CELERY_RESULT_SERIALIZER = 'json'
+    CELERY_TASK_IGNORE_RESULT = False
+    CELERY_BEAT_SCHEDULE = {
         'evening-reminder': {
             'task': 'workers.send_daily_reminders',
-            'schedule': crontab(hour=18, minute=0)  # 6 PM IST
+            'schedule': crontab(hour=18, minute=0)
         },
         'monthly-report': {
             'task': 'workers.send_monthly_reports',
-            'schedule': crontab(0, 0, day_of_month='1')  # 1st of each month
+            'schedule': crontab(0, 0, day_of_month='1')
         }
     }
+
+# Update Celery config
+celery.conf.update(
+    broker_url=Config.CELERY_BROKER_URL,
+    result_backend=Config.CELERY_RESULT_BACKEND,
+    timezone=Config.CELERY_TIMEZONE,
+    task_serializer=Config.CELERY_TASK_SERIALIZER,
+    accept_content=Config.CELERY_ACCEPT_CONTENT,
+    result_serializer=Config.CELERY_RESULT_SERIALIZER,
+    task_ignore_result=Config.CELERY_TASK_IGNORE_RESULT,
+    beat_schedule=Config.CELERY_BEAT_SCHEDULE
 )
+
+def get_flask_app():
+    """Get Flask app instance"""
+    try:
+        print("Creating Flask app...")  # Debug log
+        from app import create_app
+        flask_app = create_app()
+        print("Flask app created successfully")  # Debug log
+        return flask_app
+    except Exception as e:
+        print(f"Error creating Flask app: {str(e)}")  # Debug log
+        print(f"Python path: {sys.path}")  # Debug log
+        raise
 
 def ensure_context(f):
     """Ensure function runs within Flask app context"""
     @wraps(f)
     def wrapper(*args, **kwargs):
         try:
-            # Try importing app
-            from app import create_app
-            print("Successfully imported app")  # Debug log
-        except ImportError as e:
-            print(f"Import error: {str(e)}")  # Debug log
-            print(f"Current path: {sys.path}")  # Debug log
+            flask_app = get_flask_app()
+            with flask_app.app_context():
+                print(f"Executing task with app context: {f.__name__}")  # Debug log
+                return f(*args, **kwargs)
+        except Exception as e:
+            print(f"Context error in {f.__name__}: {str(e)}")  # Debug log
             raise
-
-        app = create_app()
-        with app.app_context():
-            print(f"Executing task with app context: {f.__name__}")  # Debug log
-            return f(*args, **kwargs)
     return wrapper
 
 def log_task_status(name):
@@ -72,139 +91,6 @@ def log_task_status(name):
                 raise
         return wrapper
     return decorator
-
-@celery.task(ignore_result=False)
-@ensure_context
-@log_task_status("daily_reminders")
-def send_daily_reminders():
-    """Send daily reminders to inactive users and notify about new quizzes"""
-    # Lazy imports to avoid circular dependency
-    from models import User, Quiz, Scores, Role
-    from extensions import mail
-    from flask import current_app
-    
-    ist = pytz.timezone('Asia/Kolkata')
-    now = datetime.now(ist)
-    yesterday = now - timedelta(days=1)
-    
-    print("Finding inactive users...")  # Debug log
-    
-    # Find inactive users (excluding admins)
-    inactive_users = User.query.join(User.roles).filter(
-        ~User.scores.any(Scores.time_stamp_of_attempt > yesterday),
-        Role.name == 'user'  # Only send to regular users
-    ).all()
-    
-    # Find new quizzes from last 24 hours
-    new_quizzes = Quiz.query.filter(
-        Quiz.date_of_quiz > yesterday,
-        Quiz.date_of_quiz <= now  # Only include published quizzes
-    ).all()
-    
-    if not inactive_users and not new_quizzes:
-        print("No reminders needed")  # Debug log
-        return "No reminders needed"
-        
-    for user in inactive_users:
-        message = Message(
-            'Quiz Master - Daily Update',
-            sender='quiz-master@example.com',  # Added sender
-            recipients=[user.email]
-        )
-        
-        if new_quizzes:
-            message.html = f"""
-            <h2>New Quizzes Available!</h2>
-            <p>Hello {user.full_name or user.email},</p>
-            <p>The following new quizzes have been added:</p>
-            <ul>
-                {''.join(f'<li>{quiz.name} in {quiz.chapter.name}</li>' for quiz in new_quizzes)}
-            </ul>
-            """
-        else:
-            message.html = f"""
-            <h2>Daily Reminder</h2>
-            <p>Hello {user.full_name or user.email},</p>
-            <p>Don't forget to practice your quizzes today!</p>
-            """
-        
-        try:
-            mail.send(message)
-            print(f"Reminder sent to {user.email}")  # Debug log
-        except Exception as e:
-            print(f"Failed to send reminder to {user.email}: {str(e)}")  # Debug log
-            raise
-    
-    return f"Sent reminders to {len(inactive_users)} users"
-
-@celery.task(ignore_result=False)
-@ensure_context
-@log_task_status("monthly_reports")
-def send_monthly_reports():
-    """Generate and send monthly activity reports"""
-    # Lazy imports to avoid circular dependency
-    from models import User, Scores
-    from extensions import mail
-    import charts
-    from flask import current_app
-    
-    ist = pytz.timezone('Asia/Kolkata')
-    now = datetime.now(ist)
-    last_month = now.replace(day=1) - timedelta(days=1)
-    month_start = last_month.replace(day=1)
-    
-    print("Generating monthly reports...")  # Debug log
-    
-    # Get all users
-    users = User.query.all()
-    sent_count = 0
-    
-    for user in users:
-        # Get user's scores for last month
-        monthly_scores = Scores.query.filter(
-            Scores.user_id == user.id,
-            Scores.time_stamp_of_attempt >= month_start,
-            Scores.time_stamp_of_attempt <= last_month
-        ).all()
-        
-        if not monthly_scores:
-            print(f"No activity for user {user.email}, skipping report")  # Debug log
-            continue
-        
-        # Generate user's charts
-        print(f"Generating charts for user {user.email}")  # Debug log
-        charts.cleanup_charts()
-        attempts_chart = charts.generate_user_subject_attempts()(user.id)
-        
-        message = Message(
-            f'Monthly Activity Report - {last_month.strftime("%B %Y")}',
-            sender='quiz-master@example.com',  # Added sender
-            recipients=[user.email]
-        )
-        
-        total_quizzes = len(monthly_scores)
-        avg_score = sum(s.total_scored for s in monthly_scores) / total_quizzes
-        
-        message.html = f"""
-        <h1>Monthly Activity Report - {last_month.strftime("%B %Y")}</h1>
-        <p>Hello {user.full_name or user.email},</p>
-        
-        <h2>Your Activity Summary</h2>
-        <ul>
-            <li>Quizzes Completed: {total_quizzes}</li>
-            <li>Average Score: {avg_score:.2f}</li>
-        </ul>
-        """
-        
-        try:
-            mail.send(message)
-            print(f"Monthly report sent to {user.email}")  # Debug log
-            sent_count += 1
-        except Exception as e:
-            print(f"Failed to send monthly report to {user.email}: {str(e)}")  # Debug log
-            raise
-    
-    return f"Sent monthly reports to {sent_count} active users"
 
 @celery.task(ignore_result=False)
 @ensure_context
@@ -278,3 +164,7 @@ def generate_user_export(admin_email):
         error_msg = f"Export failed: {str(e)}\nTraceback: {traceback.format_exc()}"
         print(error_msg)  # Debug log
         raise
+
+# Only include celery.py in Python path when running as main module
+if __name__ == '__main__':
+    celery.start()
