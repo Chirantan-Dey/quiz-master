@@ -14,10 +14,12 @@ from functools import wraps
 celery = Celery('quiz_master')
 celery.conf.update(
     broker_url='redis://localhost:6379/1',
+    result_backend='redis://localhost:6379/1',  # Added result backend
     timezone='Asia/Kolkata',
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
+    task_ignore_result=False,  # Enable result tracking
     beat_schedule={
         'evening-reminder': {
             'task': 'workers.send_daily_reminders',
@@ -62,7 +64,7 @@ def log_task_status(name):
         return wrapper
     return decorator
 
-@celery.task
+@celery.task(ignore_result=False)  # Enable result for this task
 @ensure_context
 @log_task_status("daily_reminders")
 def send_daily_reminders():
@@ -117,7 +119,7 @@ def send_daily_reminders():
     
     return f"Sent reminders to {len(inactive_users)} users"
 
-@celery.task
+@celery.task(ignore_result=False)  # Enable result for this task
 @ensure_context
 @log_task_status("monthly_reports")
 def send_monthly_reports():
@@ -129,6 +131,8 @@ def send_monthly_reports():
     
     # Get all users
     users = User.query.all()
+    sent_count = 0
+    
     for user in users:
         # Get user's scores for last month
         monthly_scores = Scores.query.filter(
@@ -168,12 +172,13 @@ def send_monthly_reports():
         try:
             mail.send(message)
             current_app.logger.info(f"Monthly report sent to {user.email}")
+            sent_count += 1
         except Exception as e:
             current_app.logger.error(f"Failed to send monthly report to {user.email}: {str(e)}")
     
-    return f"Sent monthly reports to active users"
+    return f"Sent monthly reports to {sent_count} active users"
 
-@celery.task
+@celery.task(ignore_result=False)  # Enable result for this task
 @ensure_context
 @log_task_status("user_export")
 def generate_user_export(admin_email):
