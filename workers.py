@@ -2,18 +2,10 @@ from celery import Celery
 from celery.schedules import crontab
 from flask_excel import make_response_from_array
 from datetime import datetime, timedelta
-from models import User, Quiz, Scores, Role, db
-import charts  # Import the entire module
-from extensions import mail, cache
 from flask_mail import Message
-from flask import current_app
 import pytz
 from functools import wraps
 import traceback
-from app import create_app
-
-# Create Flask app for context
-flask_app = create_app()
 
 # Initialize Celery
 celery = Celery('quiz_master')
@@ -41,7 +33,10 @@ def ensure_context(f):
     """Ensure function runs within Flask app context"""
     @wraps(f)
     def wrapper(*args, **kwargs):
-        with flask_app.app_context():
+        # Lazy import to avoid circular dependency
+        from app import create_app
+        app = create_app()
+        with app.app_context():
             print(f"Executing task with app context: {f.__name__}")  # Debug log
             return f(*args, **kwargs)
     return wrapper
@@ -69,6 +64,11 @@ def log_task_status(name):
 @log_task_status("daily_reminders")
 def send_daily_reminders():
     """Send daily reminders to inactive users and notify about new quizzes"""
+    # Lazy imports to avoid circular dependency
+    from models import User, Quiz, Scores, Role
+    from extensions import mail
+    from flask import current_app
+    
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
     yesterday = now - timedelta(days=1)
@@ -128,6 +128,12 @@ def send_daily_reminders():
 @log_task_status("monthly_reports")
 def send_monthly_reports():
     """Generate and send monthly activity reports"""
+    # Lazy imports to avoid circular dependency
+    from models import User, Scores
+    from extensions import mail
+    import charts
+    from flask import current_app
+    
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
     last_month = now.replace(day=1) - timedelta(days=1)
@@ -191,6 +197,11 @@ def send_monthly_reports():
 @log_task_status("user_export")
 def generate_user_export(admin_email):
     """Generate CSV export using flask-excel"""
+    # Lazy imports to avoid circular dependency
+    from models import User
+    from extensions import mail
+    from flask import current_app
+    
     print(f"Starting export for {admin_email}")  # Debug log
     
     # Verify admin role
