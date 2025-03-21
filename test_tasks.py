@@ -332,6 +332,6 @@ if __name__ == "__main__":
     
     # Start test tasks worker if not already running
     if len(sys.argv) > 1 and sys.argv[1] == 'worker':
-        test_celery.worker_main(['worker', '--loglevel=DEBUG'])
+        test_celery.worker_main(['worker', '--loglevel=DEBUG', '--pool=solo'])
     else:
         sys.exit(test_tasks())
