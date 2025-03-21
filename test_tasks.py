@@ -109,7 +109,6 @@ def check_task_result(task, timeout=30):
 
 def check_mailhog():
     """Check MailHog for recently sent emails"""
-    import requests
     logger.info("Checking MailHog for emails")
     response = requests.get('http://localhost:8025/api/v2/messages')
     if response.ok:
@@ -206,7 +205,9 @@ def test_daily_reminders():
         logger.info("Imports successful")
         
         # Find users (excluding admins)
-        users = User.query.join(User.roles).filter(Role.name == 'user').limit(3).all()
+        users = User.query.join(User.roles).filter(
+            Role.name == 'user'  # Only get regular users
+        ).limit(3).all()
         logger.info(f"Found {len(users)} users")
         
         sent_count = 0
@@ -288,12 +289,15 @@ def test_monthly_reports():
     """Test monthly reports task"""
     try:
         logger.info("Starting monthly reports test")
-        from models import User, Quiz, Subject
+        from models import User, Quiz, Subject, Role
         from extensions import mail
         logger.info("Imports successful")
         
-        users = User.query.limit(3).all()
-        logger.info(f"Processing reports for {len(users)} users")
+        # Get only non-admin users
+        users = User.query.join(User.roles).filter(
+            Role.name == 'user'  # Only get regular users
+        ).limit(3).all()
+        logger.info(f"Processing reports for {len(users)} non-admin users")
         sent_count = 0
         
         for user in users:
@@ -404,19 +408,22 @@ def test_user_export(admin_email):
     """Test user export task"""
     try:
         logger.info("Starting export test")
-        from models import User, Subject
+        from models import User, Subject, Role
         from extensions import mail
         logger.info("Imports successful")
         
         # Verify admin role
-        user = User.query.filter_by(email=admin_email).first()
-        if not user or 'admin' not in [role.name for role in user.roles]:
+        admin_user = User.query.filter_by(email=admin_email).first()
+        if not admin_user or 'admin' not in [role.name for role in admin_user.roles]:
             error_msg = f"Unauthorized export attempt by {admin_email}"
             logger.error(error_msg)
             raise ValueError('Unauthorized access')
         
-        users = User.query.all()
-        logger.info(f"Exporting data for {len(users)} users")
+        # Get only non-admin users
+        users = User.query.join(User.roles).filter(
+            Role.name == 'user'  # Only export regular users
+        ).all()
+        logger.info(f"Exporting data for {len(users)} non-admin users")
         
         # Get all subjects for per-subject stats
         subjects = Subject.query.all()
@@ -424,7 +431,7 @@ def test_user_export(admin_email):
         
         # Prepare headers
         headers = [
-            'User ID', 'Name', 'Email', 'Roles',
+            'User ID', 'Name', 'Email',
             'Total Quizzes', 'Overall Average', 'Best Score',
             'Recent Quizzes (7 days)', 'Recent Average',
             'Last Quiz Date'
@@ -450,7 +457,6 @@ def test_user_export(admin_email):
                 user.id,
                 user.full_name or 'N/A',
                 user.email,
-                ', '.join(role.name for role in user.roles)
             ]
             
             # Overall stats
@@ -505,12 +511,12 @@ def test_user_export(admin_email):
             "</div>",
             "<h3>Included Data</h3>",
             "<ul>",
-            "<li>User details and roles</li>",
+            "<li>User details</li>",
             "<li>Overall performance metrics</li>",
             "<li>Subject-wise breakdown</li>",
             "<li>Recent activity data</li>",
             "</ul>",
-            "<p>Please find the detailed CSV export attached.</p>"
+            "<p>Note: This export contains data for regular users only.</p>"
         ]
         
         message.html = format_email_html("\n".join(html_content), "User Data Export")
