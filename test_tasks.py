@@ -1,3 +1,4 @@
+from celery import Celery
 from datetime import datetime, timedelta
 from flask_mail import Message
 import pytz
@@ -14,32 +15,94 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Import the existing Celery app and tasks
-from workers import (
-    celery, 
-    generate_user_export, 
-    ensure_context,
-    log_task_status,
-    get_flask_app
+# Create new Celery app for tests with explicit task registration
+test_celery = Celery('test_tasks')
+
+# Configure Celery
+test_celery.conf.update(
+    broker_url='redis://localhost:6379/1',
+    result_backend='redis://localhost:6379/1',
+    imports=['test_tasks'],  # Ensure this module is imported
+    task_ignore_result=False,
+    task_serializer='json',
+    accept_content=['json'],
+    result_serializer='json'
 )
+
+def get_flask_app():
+    """Get Flask app instance"""
+    try:
+        logger.info("Creating Flask app...")
+        from app import create_app
+        flask_app = create_app()
+        logger.info("Flask app created successfully")
+        init_excel(flask_app)
+        return flask_app
+    except Exception as e:
+        logger.error(f"Error creating Flask app: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
+
+def ensure_context(f):
+    """Ensure function runs within Flask app context"""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            flask_app = get_flask_app()
+            with flask_app.app_context():
+                logger.info(f"Executing {f.__name__} within app context")
+                return f(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Context error in {f.__name__}: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
+    return wrapper
+
+def log_task_status(name):
+    """Decorator to log task status"""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            task_id = test_celery.current_task.request.id if test_celery.current_task else 'NO-ID'
+            logger.info(f"Task {name} [{task_id}] started")
+            try:
+                result = f(*args, **kwargs)
+                logger.info(f"Task {name} [{task_id}] completed successfully")
+                return result
+            except Exception as e:
+                error_msg = f"Task {name} [{task_id}] failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+                logger.error(error_msg)
+                raise
+        return wrapper
+    return decorator
 
 def check_task_result(task, timeout=30):
     """Monitor task execution and return result"""
     logger.info(f"Monitoring task: {task.id}")
     start_time = time.time()
+    last_status = None
+    
     while time.time() - start_time < timeout:
+        status = task.status
+        if status != last_status:
+            logger.info(f"Task status: {status}")
+            last_status = status
+            
         if task.ready():
             if task.successful():
-                logger.info(f"Task completed: {task.result}")
+                result = task.result
+                logger.info(f"Task completed: {result}")
                 return True
             else:
-                logger.error(f"Task failed: {task.result}")
-                if isinstance(task.result, Exception):
-                    logger.error(f"Error: {str(task.result)}")
+                error = task.result
+                logger.error(f"Task failed: {error}")
+                if isinstance(error, Exception):
+                    logger.error(f"Error: {str(error)}")
                     logger.error(f"Traceback: {task.traceback}")
                 return False
         time.sleep(1)
         print(".", end="", flush=True)
+    
     logger.warning("Task timed out")
     return False
 
@@ -59,7 +122,7 @@ def check_mailhog():
         logger.error("Failed to check MailHog")
     return response.ok
 
-@celery.task(name='tasks.test_daily_reminders')
+@test_celery.task(name='test.daily_reminders')
 @ensure_context
 @log_task_status("test_daily_reminders")
 def test_daily_reminders():
@@ -107,7 +170,7 @@ def test_daily_reminders():
         logger.error(traceback.format_exc())
         raise
 
-@celery.task(name='tasks.test_monthly_reports')
+@test_celery.task(name='test.monthly_reports')
 @ensure_context
 @log_task_status("test_monthly_reports")
 def test_monthly_reports():
@@ -155,6 +218,11 @@ def test_monthly_reports():
         logger.error(traceback.format_exc())
         raise
 
+def run_test_task(task_func, *args, **kwargs):
+    """Run a task and monitor its execution"""
+    task = task_func.delay(*args, **kwargs)
+    return check_task_result(task)
+
 def test_tasks():
     """Run all task tests"""
     logger.info("Starting task tests...")
@@ -165,18 +233,16 @@ def test_tasks():
     
     # Test daily reminders
     print("\nTesting daily reminders...")
-    task = test_daily_reminders.delay()
-    results["Daily Reminders"] = check_task_result(task)
+    results["Daily Reminders"] = run_test_task(test_daily_reminders)
     
     # Test monthly reports
     print("\nTesting monthly reports...")
-    task = test_monthly_reports.delay()
-    results["Monthly Reports"] = check_task_result(task)
+    results["Monthly Reports"] = run_test_task(test_monthly_reports)
     
-    # Test exports
+    # Test exports (using original task)
     print("\nTesting user export...")
-    task = generate_user_export.delay('admin@iitm.ac.in')
-    results["User Export"] = check_task_result(task)
+    from workers import generate_user_export
+    results["User Export"] = run_test_task(generate_user_export, 'admin@iitm.ac.in')
     
     # Verify emails were sent
     check_mailhog()
@@ -208,4 +274,8 @@ if __name__ == "__main__":
         sys.path.insert(0, app_dir)
     logger.info(f"Python path: {sys.path}")
     
-    sys.exit(test_tasks())
+    # Start test tasks worker if not already running
+    if len(sys.argv) > 1 and sys.argv[1] == 'worker':
+        test_celery.worker_main(['worker', '--loglevel=DEBUG'])
+    else:
+        sys.exit(test_tasks())
