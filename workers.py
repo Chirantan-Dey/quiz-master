@@ -9,6 +9,7 @@ from flask_mail import Message
 from flask import current_app
 import pytz
 from functools import wraps
+import traceback
 
 # Initialize Celery
 celery = Celery('quiz_master')
@@ -53,13 +54,18 @@ def log_task_status(name):
         @wraps(f)
         def wrapper(*args, **kwargs):
             task_id = celery.current_task.request.id if celery.current_task else 'NO-ID'
+            print(f"Task {name} [{task_id}] started")  # Added print for debugging
             current_app.logger.info(f"Task {name} [{task_id}] started")
             try:
                 result = f(*args, **kwargs)
                 current_app.logger.info(f"Task {name} [{task_id}] completed successfully")
+                print(f"Task {name} [{task_id}] completed successfully")  # Added print
                 return result
             except Exception as e:
                 current_app.logger.error(f"Task {name} [{task_id}] failed: {str(e)}")
+                current_app.logger.error(f"Traceback: {traceback.format_exc()}")
+                print(f"Task {name} [{task_id}] failed: {str(e)}")  # Added print
+                print(f"Traceback: {traceback.format_exc()}")  # Added print
                 raise
         return wrapper
     return decorator
@@ -87,6 +93,7 @@ def send_daily_reminders():
     
     if not inactive_users and not new_quizzes:
         current_app.logger.info("No reminders needed")
+        print("No reminders needed")  # Added print
         return "No reminders needed"
         
     for user in inactive_users:
@@ -114,8 +121,10 @@ def send_daily_reminders():
         try:
             mail.send(message)
             current_app.logger.info(f"Reminder sent to {user.email}")
+            print(f"Reminder sent to {user.email}")  # Added print
         except Exception as e:
             current_app.logger.error(f"Failed to send reminder to {user.email}: {str(e)}")
+            print(f"Failed to send reminder to {user.email}: {str(e)}")  # Added print
     
     return f"Sent reminders to {len(inactive_users)} users"
 
@@ -172,9 +181,11 @@ def send_monthly_reports():
         try:
             mail.send(message)
             current_app.logger.info(f"Monthly report sent to {user.email}")
+            print(f"Monthly report sent to {user.email}")  # Added print
             sent_count += 1
         except Exception as e:
             current_app.logger.error(f"Failed to send monthly report to {user.email}: {str(e)}")
+            print(f"Failed to send monthly report to {user.email}: {str(e)}")  # Added print
     
     return f"Sent monthly reports to {sent_count} active users"
 
@@ -183,10 +194,14 @@ def send_monthly_reports():
 @log_task_status("user_export")
 def generate_user_export(admin_email):
     """Generate CSV export using flask-excel"""
+    print(f"Starting export for {admin_email}")  # Added print
+    
     # Verify admin role
     user = User.query.filter_by(email=admin_email).first()
     if not user or 'admin' not in [role.name for role in user.roles]:
-        current_app.logger.error(f"Unauthorized export attempt by {admin_email}")
+        error_msg = f"Unauthorized export attempt by {admin_email}"
+        current_app.logger.error(error_msg)
+        print(error_msg)  # Added print
         raise ValueError('Unauthorized access')
         
     current_app.logger.info(f"Starting user data export for admin {admin_email}")
@@ -209,14 +224,18 @@ def generate_user_export(admin_email):
             last_quiz.strftime('%Y-%m-%d %H:%M:%S') if last_quiz else 'Never'
         ])
     
+    print(f"Generated data for {len(users)} users")  # Added print
+    
     try:
         # Generate CSV
         current_app.logger.info("Generating CSV file")
+        print("Generating CSV file")  # Added print
         excel_file = make_response_from_array(data, "csv")
         
         # Send email
         message = Message(
             'Quiz Master - User Data Export',
+            sender='quiz-master@example.com',  # Added sender
             recipients=[admin_email]
         )
         message.html = f"""
@@ -229,10 +248,15 @@ def generate_user_export(admin_email):
             "text/csv",
             excel_file.get_data()
         )
+        
+        print(f"Sending export email to {admin_email}")  # Added print
         mail.send(message)
         
         current_app.logger.info(f"Export completed and sent to {admin_email}")
+        print(f"Export completed and sent to {admin_email}")  # Added print
         return "Export completed and sent"
     except Exception as e:
-        current_app.logger.error(f"Export failed: {str(e)}")
+        error_msg = f"Export failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+        current_app.logger.error(error_msg)
+        print(error_msg)  # Added print
         raise
