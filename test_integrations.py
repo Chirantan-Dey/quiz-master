@@ -9,12 +9,24 @@ import json
 import time
 import psutil
 import socket
+from subprocess import check_output, PIPE, CalledProcessError
+
+def check_celery_status():
+    """Check if Celery worker is running using celery status command"""
+    try:
+        # Use celery status command instead of process check
+        check_output(['celery', '-A', 'workers.celery', 'status'], stderr=PIPE)
+        return True
+    except CalledProcessError:
+        return False
 
 def check_process_running(process_name):
     """Check if a process is running"""
     for proc in psutil.process_iter(['name', 'cmdline']):
         try:
-            if process_name in str(proc.info).lower():
+            # Get full command line to match more accurately
+            cmdline = ' '.join(proc.cmdline()).lower() if proc.cmdline() else ''
+            if process_name.lower() in cmdline:
                 return True
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
@@ -110,8 +122,8 @@ def test_celery_task():
     print("\nTesting Celery task execution...")
     
     try:
-        # Check if Celery worker is running
-        if not check_process_running('celery worker'):
+        # Check if Celery worker is running using status command
+        if not check_celery_status():
             print("✗ Celery worker is not running")
             return False
 
