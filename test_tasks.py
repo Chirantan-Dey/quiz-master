@@ -126,7 +126,7 @@ def check_mailhog():
 @ensure_context
 @log_task_status("test_daily_reminders")
 def test_daily_reminders():
-    """Test daily reminders with full quiz information"""
+    """Test daily reminders task"""
     try:
         logger.info("Starting daily reminders test")
         from models import User, Quiz, Scores, Role
@@ -137,19 +137,17 @@ def test_daily_reminders():
         inactive_users = User.query.join(User.roles).filter(
             Role.name == 'user'
         ).limit(3).all()
-        
         logger.info(f"Found {len(inactive_users)} users")
-        
-        # Get recent quizzes
-        new_quizzes = Quiz.query.all()
-        logger.info(f"Found {len(new_quizzes)} quizzes")
         
         sent_count = 0
         for user in inactive_users:
             # Get user's scores
             scores = user.scores
-            attempted_quizzes = {s.quiz_id for s in scores}
-            unattempted_quizzes = [q for q in new_quizzes if q.id not in attempted_quizzes]
+            attempted_quiz_ids = {s.quiz_id for s in scores}
+            
+            # Get available quizzes
+            available_quizzes = Quiz.query.all()
+            unattempted_quizzes = [q for q in available_quizzes if q.id not in attempted_quiz_ids]
             
             message = Message(
                 'Quiz Master - Daily Update',
@@ -165,14 +163,14 @@ def test_daily_reminders():
             
             if unattempted_quizzes:
                 html_content.extend([
-                    "<h3>New Quizzes Available:</h3>",
+                    "<h3>Available Quizzes:</h3>",
                     "<ul>"
                 ])
                 for quiz in unattempted_quizzes:
                     html_content.append(
-                        f"<li><strong>{quiz.name}</strong> - {quiz.chapter.name}"
-                        f"<br>Questions: {len(quiz.questions)}"
-                        f"<br>Duration: {quiz.time_limit} minutes</li>"
+                        f"<li><strong>{quiz.name}</strong>"
+                        f"<br>Chapter: {quiz.chapter.name}"
+                        f"<br>Questions: {len(quiz.questions)}</li>"
                     )
                 html_content.append("</ul>")
             
@@ -201,7 +199,7 @@ def test_daily_reminders():
 @ensure_context
 @log_task_status("test_monthly_reports")
 def test_monthly_reports():
-    """Test monthly reports with detailed statistics"""
+    """Test monthly reports task"""
     try:
         logger.info("Starting monthly reports test")
         from models import User, Scores, Quiz, Subject
@@ -224,54 +222,65 @@ def test_monthly_reports():
                     subject_scores[subject.name] = {
                         'total_score': 0,
                         'count': 0,
-                        'best_score': 0
+                        'best_score': 0,
+                        'scores': []
                     }
                 
                 stats = subject_scores[subject.name]
                 stats['total_score'] += score.total_scored
                 stats['count'] += 1
                 stats['best_score'] = max(stats['best_score'], score.total_scored)
+                stats['scores'].append(score)
             
             # Build HTML report
             html_content = [
-                f"<h1>Monthly Activity Report for {user.full_name or user.email}</h1>",
+                f"<h1>Activity Report for {user.full_name or user.email}</h1>",
                 "<h2>Overall Statistics</h2>",
                 "<ul>",
-                f"<li>Total Quizzes Attempted: {len(scores)}</li>",
-                f"<li>Overall Average Score: {sum(s.total_scored for s in scores)/len(scores):.2f}% (if scores)</li>",
-                "</ul>",
-                "<h2>Subject-wise Performance</h2>"
+                f"<li>Total Quizzes Attempted: {len(scores)}</li>"
             ]
             
-            for subject, stats in subject_scores.items():
-                avg_score = stats['total_score'] / stats['count']
-                html_content.extend([
-                    f"<h3>{subject}</h3>",
-                    "<ul>",
-                    f"<li>Quizzes Attempted: {stats['count']}</li>",
-                    f"<li>Average Score: {avg_score:.2f}%</li>",
-                    f"<li>Best Score: {stats['best_score']:.2f}%</li>",
-                    "</ul>"
-                ])
+            if scores:
+                avg_score = sum(s.total_scored for s in scores)/len(scores)
+                html_content.append(f"<li>Overall Average Score: {avg_score:.2f}%</li>")
+                html_content.append(f"<li>Best Score: {max(s.total_scored for s in scores):.2f}%</li>")
+            else:
+                html_content.append("<li>No quizzes attempted yet</li>")
             
-            # Recent activity
-            html_content.extend([
-                "<h2>Recent Quiz Activity</h2>",
-                "<table border='1'>",
-                "<tr><th>Quiz</th><th>Score</th><th>Date</th></tr>"
-            ])
+            html_content.append("</ul>")
             
-            for score in sorted(scores, key=lambda s: s.time_stamp_of_attempt, reverse=True)[:5]:
-                html_content.append(
-                    f"<tr><td>{score.quiz.name}</td>"
-                    f"<td>{score.total_scored:.2f}%</td>"
-                    f"<td>{score.time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M')}</td></tr>"
-                )
-            
-            html_content.append("</table>")
+            if subject_scores:
+                html_content.append("<h2>Subject-wise Performance</h2>")
+                for subject, stats in subject_scores.items():
+                    avg_score = stats['total_score'] / stats['count']
+                    html_content.extend([
+                        f"<h3>{subject}</h3>",
+                        "<ul>",
+                        f"<li>Quizzes Attempted: {stats['count']}</li>",
+                        f"<li>Average Score: {avg_score:.2f}%</li>",
+                        f"<li>Best Score: {stats['best_score']:.2f}%</li>",
+                        "</ul>",
+                        "<h4>Recent Attempts:</h4>",
+                        "<ul>"
+                    ])
+                    
+                    # Show last 3 attempts for this subject
+                    recent_scores = sorted(
+                        stats['scores'],
+                        key=lambda s: s.time_stamp_of_attempt,
+                        reverse=True
+                    )[:3]
+                    
+                    for score in recent_scores:
+                        html_content.append(
+                            f"<li>{score.quiz.name}: {score.total_scored:.2f}% "
+                            f"on {score.time_stamp_of_attempt.strftime('%Y-%m-%d')}</li>"
+                        )
+                    
+                    html_content.append("</ul>")
             
             message = Message(
-                'Quiz Master - Monthly Activity Report',
+                'Quiz Master - Activity Report',
                 sender='quiz-master@example.com',
                 recipients=[user.email]
             )
@@ -287,7 +296,7 @@ def test_monthly_reports():
                 logger.error(traceback.format_exc())
                 raise
         
-        result = f"Monthly reports sent to {sent_count} users"
+        result = f"Reports sent to {sent_count} users"
         logger.info(result)
         return result
         
@@ -300,7 +309,7 @@ def test_monthly_reports():
 @ensure_context
 @log_task_status("test_user_export")
 def test_user_export(admin_email):
-    """Test user export with comprehensive data"""
+    """Test user export task"""
     try:
         logger.info("Starting export test")
         from models import User, Subject
@@ -339,29 +348,39 @@ def test_user_export(admin_email):
         
         for user in users:
             scores = user.scores
-            user_row = [
+            row = [
                 user.id,
                 user.full_name or 'N/A',
                 user.email,
-                len(scores),
-                f"{sum(s.total_scored for s in scores)/len(scores):.2f}%" if scores else "0%",
-                f"{max(s.total_scored for s in scores):.2f}%" if scores else "0%",
-                scores[-1].time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M') if scores else 'Never'
+                len(scores)
             ]
             
-            # Add subject-wise stats
+            # Overall stats
+            if scores:
+                row.extend([
+                    f"{sum(s.total_scored for s in scores)/len(scores):.2f}%",
+                    f"{max(s.total_scored for s in scores):.2f}%",
+                    scores[-1].time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M')
+                ])
+            else:
+                row.extend(['0%', '0%', 'Never'])
+            
+            # Subject-wise stats
             for subject in subject_names:
                 subject_scores = [
                     s for s in scores 
                     if s.quiz.chapter.subject.name == subject
                 ]
-                user_row.extend([
-                    len(subject_scores),
-                    f"{sum(s.total_scored for s in subject_scores)/len(subject_scores):.2f}%" if subject_scores else "0%",
-                    f"{max(s.total_scored for s in subject_scores):.2f}%" if subject_scores else "0%"
-                ])
+                if subject_scores:
+                    row.extend([
+                        len(subject_scores),
+                        f"{sum(s.total_scored for s in subject_scores)/len(subject_scores):.2f}%",
+                        f"{max(s.total_scored for s in subject_scores):.2f}%"
+                    ])
+                else:
+                    row.extend([0, '0%', '0%'])
             
-            data.append(user_row)
+            data.append(row)
         
         # Generate CSV
         logger.info("Generating CSV file...")
