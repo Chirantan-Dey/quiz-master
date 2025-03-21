@@ -6,6 +6,13 @@ from flask_mail import Message
 import pytz
 from functools import wraps
 import traceback
+import os
+import sys
+
+# Add current directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
 
 # Initialize Celery
 celery = Celery('quiz_master')
@@ -33,8 +40,15 @@ def ensure_context(f):
     """Ensure function runs within Flask app context"""
     @wraps(f)
     def wrapper(*args, **kwargs):
-        # Lazy import to avoid circular dependency
-        from app import create_app
+        try:
+            # Try importing app
+            from app import create_app
+            print("Successfully imported app")  # Debug log
+        except ImportError as e:
+            print(f"Import error: {str(e)}")  # Debug log
+            print(f"Current path: {sys.path}")  # Debug log
+            raise
+
         app = create_app()
         with app.app_context():
             print(f"Executing task with app context: {f.__name__}")  # Debug log
