@@ -1,3 +1,14 @@
+# Service Script Improvements
+
+## Current Issues
+1. No proper service health checks
+2. Celery worker not starting reliably
+3. No retry mechanism
+4. Limited error handling
+
+## Proposed Changes to start_services.sh
+
+```bash
 #!/bin/bash
 
 # Colors for output
@@ -102,3 +113,53 @@ trap cleanup INT TERM
 
 # Wait for interrupt
 wait
+```
+
+## Improvements Made
+
+1. Service Health Checks
+- Added dedicated check functions for each service
+- Proper timeout handling
+- Verification of service availability
+
+2. Retry Mechanism
+- Configurable maximum retries
+- Retry interval settings
+- Progressive retry attempts
+
+3. Enhanced Error Handling
+- Proper service dependency checks
+- Clear error messages
+- Graceful failure handling
+
+4. Better Cleanup
+- Proper signal handling
+- Systematic service shutdown
+- Clear status messages
+
+5. Logging and Debugging
+- Increased log verbosity
+- Clear status indicators
+- Better progress tracking
+
+## Implementation Notes
+
+To implement these changes:
+
+1. Update start_services.sh with the new code
+2. Make it executable:
+```bash
+chmod +x start_services.sh
+```
+
+3. Test with different scenarios:
+- Clean startup
+- Service failure recovery
+- Proper shutdown
+
+4. Monitor logs:
+```bash
+tail -f celery.log
+```
+
+These improvements will make the service startup more reliable and easier to troubleshoot.
