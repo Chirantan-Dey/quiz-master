@@ -10,6 +10,7 @@ import io
 from flask_excel import init_excel, make_response_from_array
 import time
 import logging
+import requests
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -122,6 +123,77 @@ def check_mailhog():
         logger.error("Failed to check MailHog")
     return response.ok
 
+def format_email_style():
+    """Return CSS styles for email"""
+    return """
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3, h4 {
+            color: #2c3e50;
+            margin-top: 20px;
+        }
+        h1 { font-size: 24px; color: #1a73e8; }
+        h2 { font-size: 20px; color: #34495e; }
+        h3 { font-size: 18px; color: #2980b9; }
+        ul { 
+            list-style-type: none;
+            padding-left: 20px;
+        }
+        li {
+            margin: 10px 0;
+            padding: 5px;
+            border-left: 3px solid #1a73e8;
+            padding-left: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+        }
+        .stats {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .highlight {
+            color: #1a73e8;
+            font-weight: bold;
+        }
+    </style>
+    """
+
+def format_email_html(content, title):
+    """Format HTML content with styling"""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        {format_email_style()}
+    </head>
+    <body>
+        <h1>{title}</h1>
+        {content}
+    </body>
+    </html>
+    """
+
 @test_celery.task(name='test.daily_reminders')
 @ensure_context
 @log_task_status("test_daily_reminders")
@@ -129,64 +201,78 @@ def test_daily_reminders():
     """Test daily reminders task"""
     try:
         logger.info("Starting daily reminders test")
-        from models import User, Quiz, Scores, Role
+        from models import User, Quiz, Role
         from extensions import mail
         logger.info("Imports successful")
         
-        # Find inactive users (excluding admins)
-        inactive_users = User.query.join(User.roles).filter(
-            Role.name == 'user'
-        ).limit(3).all()
-        logger.info(f"Found {len(inactive_users)} users")
+        # Find users (excluding admins)
+        users = User.query.join(User.roles).filter(Role.name == 'user').limit(3).all()
+        logger.info(f"Found {len(users)} users")
         
         sent_count = 0
-        for user in inactive_users:
-            # Get user's scores
+        for user in users:
             scores = user.scores
             attempted_quiz_ids = {s.quiz_id for s in scores}
             
-            # Get available quizzes
-            available_quizzes = Quiz.query.all()
-            unattempted_quizzes = [q for q in available_quizzes if q.id not in attempted_quiz_ids]
+            # Get unattempted quizzes
+            quizzes = Quiz.query.all()
+            unattempted = [q for q in quizzes if q.id not in attempted_quiz_ids]
+            
+            html_content = [
+                f"<div class='stats'>",
+                f"<h2>Hello {user.full_name or user.email}!</h2>",
+                "<h3>Quiz Status</h3>",
+                "<ul>",
+                f"<li>Quizzes Attempted: <span class='highlight'>{len(scores)}</span></li>",
+                f"<li>Quizzes Available: <span class='highlight'>{len(unattempted)}</span></li>"
+            ]
+            
+            if scores:
+                avg_score = sum(s.total_scored for s in scores)/len(scores)
+                html_content.append(f"<li>Average Score: <span class='highlight'>{avg_score:.2f}%</span></li>")
+            
+            html_content.append("</ul></div>")
+            
+            if unattempted:
+                html_content.extend([
+                    "<h3>Available Quizzes</h3>",
+                    "<table>",
+                    "<tr><th>Quiz</th><th>Chapter</th><th>Subject</th><th>Questions</th></tr>"
+                ])
+                
+                for quiz in unattempted:
+                    html_content.append(
+                        f"<tr>"
+                        f"<td>{quiz.name}</td>"
+                        f"<td>{quiz.chapter.name}</td>"
+                        f"<td>{quiz.chapter.subject.name}</td>"
+                        f"<td>{len(quiz.questions)}</td>"
+                        f"</tr>"
+                    )
+                
+                html_content.append("</table>")
+                html_content.append("<p>Don't miss out on these learning opportunities!</p>")
+            else:
+                html_content.append("<p>Great job! You've attempted all available quizzes.</p>")
             
             message = Message(
                 'Quiz Master - Daily Update',
                 sender='quiz-master@example.com',
                 recipients=[user.email]
             )
-            
-            html_content = [
-                f"<h2>Quiz Update for {user.full_name or user.email}</h2>",
-                "<h3>Your Quiz Status:</h3>",
-                f"<p>Total Quizzes Attempted: {len(scores)}</p>"
-            ]
-            
-            if unattempted_quizzes:
-                html_content.extend([
-                    "<h3>Available Quizzes:</h3>",
-                    "<ul>"
-                ])
-                for quiz in unattempted_quizzes:
-                    html_content.append(
-                        f"<li><strong>{quiz.name}</strong>"
-                        f"<br>Chapter: {quiz.chapter.name}"
-                        f"<br>Questions: {len(quiz.questions)}</li>"
-                    )
-                html_content.append("</ul>")
-            
-            message.html = "\n".join(html_content)
+            message.html = format_email_html("\n".join(html_content), "Daily Quiz Update")
             
             try:
                 logger.info(f"Sending reminder to {user.email}")
                 mail.send(message)
                 sent_count += 1
                 logger.info(f"Reminder sent to {user.email}")
-            except Exception as mail_error:
-                logger.error(f"Failed to send reminder to {user.email}: {str(mail_error)}")
+            except Exception as e:
+                logger.error(f"Failed to send reminder to {user.email}: {str(e)}")
                 logger.error(traceback.format_exc())
                 raise
         
-        result = f"Reminders sent to {sent_count} users"
+        result = f"Daily reminders sent to {sent_count} users"
         logger.info(result)
         return result
         
@@ -202,7 +288,7 @@ def test_monthly_reports():
     """Test monthly reports task"""
     try:
         logger.info("Starting monthly reports test")
-        from models import User, Scores, Quiz, Subject
+        from models import User, Quiz, Subject
         from extensions import mail
         logger.info("Imports successful")
         
@@ -211,92 +297,98 @@ def test_monthly_reports():
         sent_count = 0
         
         for user in users:
-            # Get all user's scores
             scores = user.scores
             
             # Get subject-wise performance
-            subject_scores = {}
+            subject_stats = {}
             for score in scores:
                 subject = score.quiz.chapter.subject
-                if subject.name not in subject_scores:
-                    subject_scores[subject.name] = {
+                if subject.name not in subject_stats:
+                    subject_stats[subject.name] = {
                         'total_score': 0,
                         'count': 0,
                         'best_score': 0,
                         'scores': []
                     }
                 
-                stats = subject_scores[subject.name]
+                stats = subject_stats[subject.name]
                 stats['total_score'] += score.total_scored
                 stats['count'] += 1
                 stats['best_score'] = max(stats['best_score'], score.total_scored)
                 stats['scores'].append(score)
             
-            # Build HTML report
+            # Build HTML content
             html_content = [
-                f"<h1>Activity Report for {user.full_name or user.email}</h1>",
-                "<h2>Overall Statistics</h2>",
-                "<ul>",
-                f"<li>Total Quizzes Attempted: {len(scores)}</li>"
+                "<div class='stats'>",
+                "<h2>Overall Performance</h2>",
+                "<ul>"
             ]
             
             if scores:
                 avg_score = sum(s.total_scored for s in scores)/len(scores)
-                html_content.append(f"<li>Overall Average Score: {avg_score:.2f}%</li>")
-                html_content.append(f"<li>Best Score: {max(s.total_scored for s in scores):.2f}%</li>")
+                html_content.extend([
+                    f"<li>Total Quizzes: <span class='highlight'>{len(scores)}</span></li>",
+                    f"<li>Average Score: <span class='highlight'>{avg_score:.2f}%</span></li>",
+                    f"<li>Best Score: <span class='highlight'>{max(s.total_scored for s in scores):.2f}%</span></li>"
+                ])
             else:
                 html_content.append("<li>No quizzes attempted yet</li>")
             
-            html_content.append("</ul>")
+            html_content.append("</ul></div>")
             
-            if subject_scores:
-                html_content.append("<h2>Subject-wise Performance</h2>")
-                for subject, stats in subject_scores.items():
-                    avg_score = stats['total_score'] / stats['count']
+            if subject_stats:
+                for subject, stats in subject_stats.items():
+                    avg = stats['total_score'] / stats['count']
                     html_content.extend([
+                        "<div class='stats'>",
                         f"<h3>{subject}</h3>",
                         "<ul>",
-                        f"<li>Quizzes Attempted: {stats['count']}</li>",
-                        f"<li>Average Score: {avg_score:.2f}%</li>",
-                        f"<li>Best Score: {stats['best_score']:.2f}%</li>",
+                        f"<li>Quizzes: <span class='highlight'>{stats['count']}</span></li>",
+                        f"<li>Average: <span class='highlight'>{avg:.2f}%</span></li>",
+                        f"<li>Best: <span class='highlight'>{stats['best_score']:.2f}%</span></li>",
                         "</ul>",
-                        "<h4>Recent Attempts:</h4>",
-                        "<ul>"
+                        "<h4>Recent Attempts</h4>",
+                        "<table>",
+                        "<tr><th>Quiz</th><th>Score</th><th>Date</th><th>Questions</th></tr>"
                     ])
                     
-                    # Show last 3 attempts for this subject
-                    recent_scores = sorted(
-                        stats['scores'],
-                        key=lambda s: s.time_stamp_of_attempt,
-                        reverse=True
-                    )[:3]
-                    
-                    for score in recent_scores:
+                    recent = sorted(stats['scores'], key=lambda s: s.time_stamp_of_attempt, reverse=True)[:5]
+                    for score in recent:
                         html_content.append(
-                            f"<li>{score.quiz.name}: {score.total_scored:.2f}% "
-                            f"on {score.time_stamp_of_attempt.strftime('%Y-%m-%d')}</li>"
+                            f"<tr>"
+                            f"<td>{score.quiz.name}</td>"
+                            f"<td>{score.total_scored:.2f}%</td>"
+                            f"<td>{score.time_stamp_of_attempt.strftime('%Y-%m-%d')}</td>"
+                            f"<td>{len(score.quiz.questions)}</td>"
+                            f"</tr>"
                         )
                     
-                    html_content.append("</ul>")
+                    html_content.extend([
+                        "</table>",
+                        "</div>"
+                    ])
             
             message = Message(
-                'Quiz Master - Activity Report',
+                'Quiz Master - Monthly Activity Report',
                 sender='quiz-master@example.com',
                 recipients=[user.email]
             )
-            message.html = "\n".join(html_content)
+            message.html = format_email_html(
+                "\n".join(html_content),
+                f"Monthly Activity Report for {user.full_name or user.email}"
+            )
             
             try:
                 logger.info(f"Sending report to {user.email}")
                 mail.send(message)
                 sent_count += 1
                 logger.info(f"Report sent to {user.email}")
-            except Exception as mail_error:
-                logger.error(f"Failed to send report to {user.email}: {str(mail_error)}")
+            except Exception as e:
+                logger.error(f"Failed to send report to {user.email}: {str(e)}")
                 logger.error(traceback.format_exc())
                 raise
         
-        result = f"Reports sent to {sent_count} users"
+        result = f"Monthly reports sent to {sent_count} users"
         logger.info(result)
         return result
         
@@ -332,8 +424,9 @@ def test_user_export(admin_email):
         
         # Prepare headers
         headers = [
-            'User ID', 'Name', 'Email', 
+            'User ID', 'Name', 'Email', 'Roles',
             'Total Quizzes', 'Overall Average', 'Best Score',
+            'Recent Quizzes (7 days)', 'Recent Average',
             'Last Quiz Date'
         ]
         # Add per-subject columns
@@ -341,44 +434,52 @@ def test_user_export(admin_email):
             headers.extend([
                 f"{subject} Quizzes",
                 f"{subject} Average",
-                f"{subject} Best"
+                f"{subject} Best",
+                f"{subject} Recent"
             ])
         
         data = [headers]
+        now = datetime.now()
+        week_ago = now - timedelta(days=7)
         
         for user in users:
             scores = user.scores
+            recent_scores = [s for s in scores if s.time_stamp_of_attempt >= week_ago]
+            
             row = [
                 user.id,
                 user.full_name or 'N/A',
                 user.email,
-                len(scores)
+                ', '.join(role.name for role in user.roles)
             ]
             
             # Overall stats
             if scores:
                 row.extend([
+                    len(scores),
                     f"{sum(s.total_scored for s in scores)/len(scores):.2f}%",
                     f"{max(s.total_scored for s in scores):.2f}%",
+                    len(recent_scores),
+                    f"{sum(s.total_scored for s in recent_scores)/len(recent_scores):.2f}%" if recent_scores else "N/A",
                     scores[-1].time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M')
                 ])
             else:
-                row.extend(['0%', '0%', 'Never'])
+                row.extend(['0', '0%', '0%', '0', 'N/A', 'Never'])
             
             # Subject-wise stats
             for subject in subject_names:
-                subject_scores = [
-                    s for s in scores 
-                    if s.quiz.chapter.subject.name == subject
-                ]
+                subject_scores = [s for s in scores if s.quiz.chapter.subject.name == subject]
+                recent_subject = [s for s in subject_scores if s.time_stamp_of_attempt >= week_ago]
+                
                 if subject_scores:
                     row.extend([
                         len(subject_scores),
                         f"{sum(s.total_scored for s in subject_scores)/len(subject_scores):.2f}%",
-                        f"{max(s.total_scored for s in subject_scores):.2f}%"
+                        f"{max(s.total_scored for s in subject_scores):.2f}%",
+                        f"{len(recent_subject)} in last 7 days"
                     ])
                 else:
-                    row.extend([0, '0%', '0%'])
+                    row.extend(['0', '0%', '0%', 'No activity'])
             
             data.append(row)
         
@@ -393,18 +494,26 @@ def test_user_export(admin_email):
             recipients=[admin_email]
         )
         
-        message.html = f"""
-        <h2>User Data Export</h2>
-        <p>Your requested export is attached. It contains:</p>
-        <ul>
-            <li>Overall user statistics</li>
-            <li>Subject-wise performance breakdown</li>
-            <li>Total of {len(users)} users</li>
-            <li>Data for {len(subject_names)} subjects</li>
-        </ul>
-        <p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        """
+        html_content = [
+            "<div class='stats'>",
+            "<h2>Export Summary</h2>",
+            "<ul>",
+            f"<li>Total Users: <span class='highlight'>{len(users)}</span></li>",
+            f"<li>Subjects: <span class='highlight'>{len(subject_names)}</span></li>",
+            f"<li>Data Points: <span class='highlight'>{len(headers)}</span></li>",
+            "</ul>",
+            "</div>",
+            "<h3>Included Data</h3>",
+            "<ul>",
+            "<li>User details and roles</li>",
+            "<li>Overall performance metrics</li>",
+            "<li>Subject-wise breakdown</li>",
+            "<li>Recent activity data</li>",
+            "</ul>",
+            "<p>Please find the detailed CSV export attached.</p>"
+        ]
         
+        message.html = format_email_html("\n".join(html_content), "User Data Export")
         message.attach(
             "user_export.csv",
             "text/csv",
