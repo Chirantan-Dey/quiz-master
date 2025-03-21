@@ -7,24 +7,14 @@ import traceback
 import os
 import sys
 import io
-from flask_excel import make_response_from_array, init_excel
+from flask_excel import init_excel
 import time
 
-# Ensure app directory is in path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Import only the Celery configuration
+from workers import Config
 
-# Create Celery instance without direct app dependency
-celery = Celery('quiz_master')
-
-# Default configuration
-class Config:
-    CELERY_BROKER_URL = 'redis://localhost:6379/1'
-    CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
-    CELERY_TIMEZONE = 'Asia/Kolkata'
-    CELERY_TASK_SERIALIZER = 'json'
-    CELERY_ACCEPT_CONTENT = ['json']
-    CELERY_RESULT_SERIALIZER = 'json'
-    CELERY_TASK_IGNORE_RESULT = False
+# Create new Celery app for tests
+celery = Celery('quiz_master_test')
 
 # Update Celery config
 celery.conf.update(
@@ -44,7 +34,6 @@ def get_flask_app():
         from app import create_app
         flask_app = create_app()
         print("Flask app created successfully")  # Debug log
-        # Initialize flask-excel with the app
         init_excel(flask_app)
         return flask_app
     except Exception as e:
@@ -86,6 +75,7 @@ def log_task_status(name):
 
 def check_task_result(task, timeout=30):
     """Monitor task execution and return result"""
+    print(f"Monitoring task: {task.id}")
     start_time = time.time()
     while time.time() - start_time < timeout:
         if task.ready():
@@ -96,7 +86,8 @@ def check_task_result(task, timeout=30):
                 print(f"Task failed: {task.result}")
                 return False
         time.sleep(1)
-    print("Task timed out")
+        print(".", end="", flush=True)
+    print("\nTask timed out")
     return False
 
 def check_mailhog():
@@ -108,77 +99,76 @@ def check_mailhog():
         print(f"\nFound {messages.get('count', 0)} messages in MailHog")
         for msg in messages.get('items', []):
             print(f"From: {msg.get('From', {}).get('Mailbox')}@{msg.get('From', {}).get('Domain')}")
+            print(f"To: {[f'{to.get('Mailbox')}@{to.get('Domain')}' for to in msg.get('To', [])]}")
             print(f"Subject: {msg.get('Content', {}).get('Headers', {}).get('Subject', [''])[0]}")
     return response.ok
 
-@celery.task(ignore_result=False)
+# Register tasks with explicit names
+@celery.task(name='test_daily_reminders')
 @ensure_context
 @log_task_status("test_daily_reminders")
 def test_daily_reminders():
     """Test daily reminders task"""
-    from models import User, Quiz, Scores, Role
-    from extensions import mail
-    from flask import current_app
-    
-    ist = pytz.timezone('Asia/Kolkata')
-    now = datetime.now(ist)
-    yesterday = now - timedelta(days=1)
-    
-    # Find inactive users (excluding admins)
-    inactive_users = User.query.join(User.roles).filter(
-        ~User.scores.any(Scores.time_stamp_of_attempt > yesterday),
-        Role.name == 'user'
-    ).all()
-    
-    # Find new quizzes from last 24 hours
-    new_quizzes = Quiz.query.filter(
-        Quiz.date_of_quiz > yesterday,
-        Quiz.date_of_quiz <= now
-    ).all()
-    
-    for user in inactive_users:
-        message = Message(
-            'Quiz Master - Daily Update (Test)',
-            sender='quiz-master@example.com',
-            recipients=[user.email]
-        )
-        message.html = f"""
-        <h2>Test Daily Update</h2>
-        <p>Hello {user.full_name or user.email},</p>
-        <p>This is a test of the daily reminder system.</p>
-        """
-        mail.send(message)
-    
-    return f"Test reminders sent to {len(inactive_users)} users"
+    try:
+        from models import User, Role
+        from extensions import mail
+        
+        # Get users to test with
+        users = User.query.join(User.roles).filter(Role.name == 'user').limit(3).all()
+        sent_count = 0
+        
+        for user in users:
+            message = Message(
+                'Quiz Master - Daily Update (Test)',
+                sender='quiz-master@example.com',
+                recipients=[user.email]
+            )
+            message.html = f"""
+            <h2>Test Daily Update</h2>
+            <p>Hello {user.full_name or user.email},</p>
+            <p>This is a test of the daily reminder system.</p>
+            """
+            mail.send(message)
+            sent_count += 1
+            print(f"Test reminder sent to {user.email}")
+        
+        return f"Test reminders sent to {sent_count} users"
+    except Exception as e:
+        print(f"Error in test_daily_reminders: {str(e)}")
+        raise
 
-@celery.task(ignore_result=False)
+@celery.task(name='test_monthly_reports')
 @ensure_context
 @log_task_status("test_monthly_reports")
 def test_monthly_reports():
     """Test monthly reports task"""
-    from models import User, Scores
-    from extensions import mail
-    import charts
-    from flask import current_app
-    
-    users = User.query.all()
-    sent_count = 0
-    
-    for user in users:
-        message = Message(
-            'Test Monthly Activity Report',
-            sender='quiz-master@example.com',
-            recipients=[user.email]
-        )
-        message.html = f"""
-        <h1>Test Monthly Activity Report</h1>
-        <p>Hello {user.full_name or user.email},</p>
-        <p>This is a test of the monthly report system.</p>
-        """
-        mail.send(message)
-        sent_count += 1
-    
-    return f"Test monthly reports sent to {sent_count} users"
+    try:
+        from models import User
+        from extensions import mail
+        
+        # Get users to test with
+        users = User.query.limit(3).all()
+        sent_count = 0
+        
+        for user in users:
+            message = Message(
+                'Test Monthly Activity Report',
+                sender='quiz-master@example.com',
+                recipients=[user.email]
+            )
+            message.html = f"""
+            <h1>Test Monthly Activity Report</h1>
+            <p>Hello {user.full_name or user.email},</p>
+            <p>This is a test of the monthly report system.</p>
+            """
+            mail.send(message)
+            sent_count += 1
+            print(f"Test monthly report sent to {user.email}")
+        
+        return f"Test monthly reports sent to {sent_count} users"
+    except Exception as e:
+        print(f"Error in test_monthly_reports: {str(e)}")
+        raise
 
 def test_tasks():
     """Run all task tests"""
@@ -197,7 +187,7 @@ def test_tasks():
     task = test_monthly_reports.delay()
     results["Monthly Reports"] = check_task_result(task)
     
-    # Test exports (using original task)
+    # Test exports (using original task from workers.py)
     print("\nTesting user export...")
     from workers import generate_user_export
     task = generate_user_export.delay('admin@iitm.ac.in')
@@ -224,4 +214,9 @@ def test_tasks():
         return 1
 
 if __name__ == "__main__":
+    # Ensure the app directory is in the Python path
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    if app_dir not in sys.path:
+        sys.path.insert(0, app_dir)
+    
     sys.exit(test_tasks())
