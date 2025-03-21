@@ -10,6 +10,10 @@ from flask import current_app
 import pytz
 from functools import wraps
 import traceback
+from app import create_app
+
+# Create Flask app for context
+flask_app = create_app()
 
 # Initialize Celery
 celery = Celery('quiz_master')
@@ -37,15 +41,9 @@ def ensure_context(f):
     """Ensure function runs within Flask app context"""
     @wraps(f)
     def wrapper(*args, **kwargs):
-        try:
-            if current_app:
-                return f(*args, **kwargs)
-        except RuntimeError:
-            # If no application context found, create one
-            from app import create_app
-            app = create_app()
-            with app.app_context():
-                return f(*args, **kwargs)
+        with flask_app.app_context():
+            print(f"Executing task with app context: {f.__name__}")  # Debug log
+            return f(*args, **kwargs)
     return wrapper
 
 def log_task_status(name):
@@ -54,23 +52,19 @@ def log_task_status(name):
         @wraps(f)
         def wrapper(*args, **kwargs):
             task_id = celery.current_task.request.id if celery.current_task else 'NO-ID'
-            print(f"Task {name} [{task_id}] started")  # Added print for debugging
-            current_app.logger.info(f"Task {name} [{task_id}] started")
+            print(f"Task {name} [{task_id}] started")  # Debug log
             try:
                 result = f(*args, **kwargs)
-                current_app.logger.info(f"Task {name} [{task_id}] completed successfully")
-                print(f"Task {name} [{task_id}] completed successfully")  # Added print
+                print(f"Task {name} [{task_id}] completed successfully")  # Debug log
                 return result
             except Exception as e:
-                current_app.logger.error(f"Task {name} [{task_id}] failed: {str(e)}")
-                current_app.logger.error(f"Traceback: {traceback.format_exc()}")
-                print(f"Task {name} [{task_id}] failed: {str(e)}")  # Added print
-                print(f"Traceback: {traceback.format_exc()}")  # Added print
+                error_msg = f"Task {name} [{task_id}] failed: {str(e)}\nTraceback: {traceback.format_exc()}"
+                print(error_msg)  # Debug log
                 raise
         return wrapper
     return decorator
 
-@celery.task(ignore_result=False)  # Enable result for this task
+@celery.task(ignore_result=False)
 @ensure_context
 @log_task_status("daily_reminders")
 def send_daily_reminders():
@@ -78,6 +72,8 @@ def send_daily_reminders():
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
     yesterday = now - timedelta(days=1)
+    
+    print("Finding inactive users...")  # Debug log
     
     # Find inactive users (excluding admins)
     inactive_users = User.query.join(User.roles).filter(
@@ -92,13 +88,13 @@ def send_daily_reminders():
     ).all()
     
     if not inactive_users and not new_quizzes:
-        current_app.logger.info("No reminders needed")
-        print("No reminders needed")  # Added print
+        print("No reminders needed")  # Debug log
         return "No reminders needed"
         
     for user in inactive_users:
         message = Message(
             'Quiz Master - Daily Update',
+            sender='quiz-master@example.com',  # Added sender
             recipients=[user.email]
         )
         
@@ -120,15 +116,14 @@ def send_daily_reminders():
         
         try:
             mail.send(message)
-            current_app.logger.info(f"Reminder sent to {user.email}")
-            print(f"Reminder sent to {user.email}")  # Added print
+            print(f"Reminder sent to {user.email}")  # Debug log
         except Exception as e:
-            current_app.logger.error(f"Failed to send reminder to {user.email}: {str(e)}")
-            print(f"Failed to send reminder to {user.email}: {str(e)}")  # Added print
+            print(f"Failed to send reminder to {user.email}: {str(e)}")  # Debug log
+            raise
     
     return f"Sent reminders to {len(inactive_users)} users"
 
-@celery.task(ignore_result=False)  # Enable result for this task
+@celery.task(ignore_result=False)
 @ensure_context
 @log_task_status("monthly_reports")
 def send_monthly_reports():
@@ -137,6 +132,8 @@ def send_monthly_reports():
     now = datetime.now(ist)
     last_month = now.replace(day=1) - timedelta(days=1)
     month_start = last_month.replace(day=1)
+    
+    print("Generating monthly reports...")  # Debug log
     
     # Get all users
     users = User.query.all()
@@ -151,16 +148,17 @@ def send_monthly_reports():
         ).all()
         
         if not monthly_scores:
-            current_app.logger.debug(f"No activity for user {user.email}, skipping report")
-            continue  # Skip users with no activity
+            print(f"No activity for user {user.email}, skipping report")  # Debug log
+            continue
         
         # Generate user's charts
-        current_app.logger.info(f"Generating charts for user {user.email}")
+        print(f"Generating charts for user {user.email}")  # Debug log
         charts.cleanup_charts()
         attempts_chart = charts.generate_user_subject_attempts()(user.id)
         
         message = Message(
             f'Monthly Activity Report - {last_month.strftime("%B %Y")}',
+            sender='quiz-master@example.com',  # Added sender
             recipients=[user.email]
         )
         
@@ -180,31 +178,29 @@ def send_monthly_reports():
         
         try:
             mail.send(message)
-            current_app.logger.info(f"Monthly report sent to {user.email}")
-            print(f"Monthly report sent to {user.email}")  # Added print
+            print(f"Monthly report sent to {user.email}")  # Debug log
             sent_count += 1
         except Exception as e:
-            current_app.logger.error(f"Failed to send monthly report to {user.email}: {str(e)}")
-            print(f"Failed to send monthly report to {user.email}: {str(e)}")  # Added print
+            print(f"Failed to send monthly report to {user.email}: {str(e)}")  # Debug log
+            raise
     
     return f"Sent monthly reports to {sent_count} active users"
 
-@celery.task(ignore_result=False)  # Enable result for this task
+@celery.task(ignore_result=False)
 @ensure_context
 @log_task_status("user_export")
 def generate_user_export(admin_email):
     """Generate CSV export using flask-excel"""
-    print(f"Starting export for {admin_email}")  # Added print
+    print(f"Starting export for {admin_email}")  # Debug log
     
     # Verify admin role
     user = User.query.filter_by(email=admin_email).first()
     if not user or 'admin' not in [role.name for role in user.roles]:
         error_msg = f"Unauthorized export attempt by {admin_email}"
-        current_app.logger.error(error_msg)
-        print(error_msg)  # Added print
+        print(error_msg)  # Debug log
         raise ValueError('Unauthorized access')
         
-    current_app.logger.info(f"Starting user data export for admin {admin_email}")
+    print("Generating user data...")  # Debug log
     
     data = [['User ID', 'Name', 'Email', 'Total Quizzes', 'Average Score', 'Last Quiz Date']]
     
@@ -224,18 +220,17 @@ def generate_user_export(admin_email):
             last_quiz.strftime('%Y-%m-%d %H:%M:%S') if last_quiz else 'Never'
         ])
     
-    print(f"Generated data for {len(users)} users")  # Added print
+    print(f"Generated data for {len(users)} users")  # Debug log
     
     try:
         # Generate CSV
-        current_app.logger.info("Generating CSV file")
-        print("Generating CSV file")  # Added print
+        print("Generating CSV file...")  # Debug log
         excel_file = make_response_from_array(data, "csv")
         
         # Send email
         message = Message(
             'Quiz Master - User Data Export',
-            sender='quiz-master@example.com',  # Added sender
+            sender='quiz-master@example.com',
             recipients=[admin_email]
         )
         message.html = f"""
@@ -249,14 +244,12 @@ def generate_user_export(admin_email):
             excel_file.get_data()
         )
         
-        print(f"Sending export email to {admin_email}")  # Added print
+        print(f"Sending export email to {admin_email}")  # Debug log
         mail.send(message)
         
-        current_app.logger.info(f"Export completed and sent to {admin_email}")
-        print(f"Export completed and sent to {admin_email}")  # Added print
+        print(f"Export completed and sent to {admin_email}")  # Debug log
         return "Export completed and sent"
     except Exception as e:
         error_msg = f"Export failed: {str(e)}\nTraceback: {traceback.format_exc()}"
-        current_app.logger.error(error_msg)
-        print(error_msg)  # Added print
+        print(error_msg)  # Debug log
         raise
