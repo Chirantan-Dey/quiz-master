@@ -25,7 +25,7 @@ check_celery() {
 }
 
 check_flask() {
-    curl -s http://localhost:5000 >/dev/null 2>&1
+    curl -s http://localhost:5000/health >/dev/null 2>&1
 }
 
 # Service startup with retries
@@ -66,6 +66,11 @@ start_service() {
 # Main script
 echo -e "${YELLOW}Starting services for Quiz Master...${NC}"
 
+# Ensure virtual environment is activated if it exists
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+fi
+
 # Start Redis
 start_service "Redis" "redis-server" "check_redis" || exit 1
 
@@ -73,19 +78,21 @@ start_service "Redis" "redis-server" "check_redis" || exit 1
 start_service "MailHog" "mailhog" "check_mailhog" || exit 1
 
 # Start Celery worker with proper logging
-start_service "Celery worker" "celery -A workers.celery worker --loglevel=debug" "check_celery" || exit 1
+start_service "Celery worker" "celery -A workers.celery worker --loglevel=info" "check_celery" || exit 1
 
-# Start Celery beat
-start_service "Celery beat" "celery -A workers.celery beat --loglevel=debug" "check_celery" || exit 1
+# Start Celery beat for scheduled tasks
+start_service "Celery beat" "celery -A workers.celery beat --loglevel=info" "check_celery" || exit 1
 
 # Start Flask application
 export FLASK_APP=app.py
-export FLASK_ENV=development
-start_service "Flask" "flask run" "check_flask" || exit 1
+export FLASK_DEBUG=1
+start_service "Flask" "python -m flask run" "check_flask" || exit 1
 
 echo -e "\n${GREEN}All services started successfully!${NC}"
-echo -e "${YELLOW}Run python test_integrations.py to test the integration${NC}"
-echo -e "\nPress Ctrl+C to stop all services"
+echo -e "${YELLOW}The Quiz Master application is now running:${NC}"
+echo -e "  - Web interface: http://localhost:5000"
+echo -e "  - MailHog interface: http://localhost:8025"
+echo -e "\nPress Ctrl+C to stop all services\n"
 
 # Improved cleanup on exit
 cleanup() {

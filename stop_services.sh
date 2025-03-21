@@ -6,60 +6,48 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 YELLOW='\033[1;33m'
 
-# Function to check if a process is running
-check_process() {
-    pgrep -f "$1" >/dev/null 2>&1
-}
+echo -e "${YELLOW}Stopping Quiz Master services...${NC}"
 
 # Function to stop a service
 stop_service() {
     service_name=$1
-    process_pattern=$2
+    pattern=$2
     
-    echo -e "Stopping $service_name..."
-    if check_process "$process_pattern"; then
-        pkill -f "$process_pattern"
-        # Wait for the process to stop
-        for i in {1..5}; do
-            if ! check_process "$process_pattern"; then
-                echo -e "${GREEN}[OK]${NC} $service_name stopped"
-                return 0
-            fi
-            sleep 1
-        done
-        # Force kill if still running
-        if check_process "$process_pattern"; then
-            pkill -9 -f "$process_pattern"
-            echo -e "${YELLOW}[WARNING]${NC} $service_name force stopped"
+    echo -ne "Stopping $service_name... "
+    
+    if pgrep -f "$pattern" > /dev/null; then
+        pkill -f "$pattern"
+        sleep 2  # Give some time for graceful shutdown
+        
+        if pgrep -f "$pattern" > /dev/null; then
+            # If still running, force kill
+            pkill -9 -f "$pattern"
         fi
+        
+        echo -e "${GREEN}[OK]${NC}"
     else
-        echo -e "${YELLOW}[INFO]${NC} $service_name was not running"
+        echo -e "${YELLOW}[NOT RUNNING]${NC}"
     fi
 }
 
-echo -e "${YELLOW}Stopping Quiz Master services...${NC}"
-
-# Stop Flask application
-stop_service "Flask application" "flask run"
-
-# Stop Celery workers
-stop_service "Celery worker" "celery.*worker"
-
-# Stop Celery beat
+# Stop services in reverse order of startup
+stop_service "Flask" "flask run"
 stop_service "Celery beat" "celery.*beat"
-
-# Stop MailHog
+stop_service "Celery worker" "celery.*worker"
 stop_service "MailHog" "mailhog"
+stop_service "Redis" "redis-server"
 
-# Stop Redis server
-stop_service "Redis server" "redis-server"
+# Final check
+running_services=""
+for pattern in "flask run" "celery.*beat" "celery.*worker" "mailhog" "redis-server"; do
+    if pgrep -f "$pattern" > /dev/null; then
+        running_services="$running_services\n  - $pattern"
+    fi
+done
 
-# Verify all processes are stopped
-if pgrep -f "redis-server|mailhog|celery|flask" > /dev/null; then
-    echo -e "\n${RED}Warning: Some processes are still running${NC}"
-    echo "Running processes:"
-    ps aux | grep -E "redis-server|mailhog|celery|flask" | grep -v grep
-    exit 1
+if [ -n "$running_services" ]; then
+    echo -e "\n${RED}Warning: Some services are still running:${NC}$running_services"
+    echo -e "You may need to stop them manually or use: sudo pkill -9 -f '<pattern>'"
 else
-    echo -e "\n${GREEN}All services stopped successfully!${NC}"
+    echo -e "\n${GREEN}All Quiz Master services stopped successfully!${NC}"
 fi
