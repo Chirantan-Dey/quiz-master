@@ -15,14 +15,14 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Create new Celery app for tests with explicit task registration
+# Create new Celery app for tests
 test_celery = Celery('test_tasks')
 
 # Configure Celery
 test_celery.conf.update(
     broker_url='redis://localhost:6379/1',
     result_backend='redis://localhost:6379/1',
-    imports=['test_tasks'],  # Ensure this module is imported
+    imports=['test_tasks'],
     task_ignore_result=False,
     task_serializer='json',
     accept_content=['json'],
@@ -129,12 +129,12 @@ def test_daily_reminders():
     """Test daily reminders task"""
     try:
         logger.info("Starting daily reminders test")
-        from models import User, Role
+        from models import User
         from extensions import mail
         logger.info("Imports successful")
         
-        # Get users to test with
-        users = User.query.join(User.roles).filter(Role.name == 'user').limit(3).all()
+        # Get users to test with - simplified query
+        users = User.query.limit(3).all()
         logger.info(f"Found {len(users)} users for testing")
         sent_count = 0
         
