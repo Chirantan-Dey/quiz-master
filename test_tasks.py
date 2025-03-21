@@ -1,4 +1,3 @@
-from celery import Celery
 from datetime import datetime, timedelta
 from flask_mail import Message
 import pytz
@@ -9,79 +8,20 @@ import sys
 import io
 from flask_excel import init_excel
 import time
+import logging
 
 # Set up logging
-import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Import only the Celery configuration
-from workers import Config
-
-# Create new Celery app for tests
-logger.info("Creating Celery app for tests")
-celery = Celery('quiz_master_test')
-
-# Update Celery config
-logger.info("Configuring Celery")
-celery.conf.update(
-    broker_url=Config.CELERY_BROKER_URL,
-    result_backend=Config.CELERY_RESULT_BACKEND,
-    timezone=Config.CELERY_TIMEZONE,
-    task_serializer=Config.CELERY_TASK_SERIALIZER,
-    accept_content=Config.CELERY_ACCEPT_CONTENT,
-    result_serializer=Config.CELERY_RESULT_SERIALIZER,
-    task_ignore_result=Config.CELERY_TASK_IGNORE_RESULT
+# Import the existing Celery app and tasks
+from workers import (
+    celery, 
+    generate_user_export, 
+    ensure_context,
+    log_task_status,
+    get_flask_app
 )
-
-def get_flask_app():
-    """Get Flask app instance"""
-    try:
-        logger.info("Creating Flask app...")
-        from app import create_app
-        flask_app = create_app()
-        logger.info("Flask app created successfully")
-        init_excel(flask_app)
-        return flask_app
-    except Exception as e:
-        logger.error(f"Error creating Flask app: {str(e)}")
-        logger.error(f"Python path: {sys.path}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
-
-def ensure_context(f):
-    """Ensure function runs within Flask app context"""
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            logger.info(f"Setting up Flask context for {f.__name__}")
-            flask_app = get_flask_app()
-            with flask_app.app_context():
-                logger.info(f"Executing {f.__name__} within app context")
-                return f(*args, **kwargs)
-        except Exception as e:
-            logger.error(f"Context error in {f.__name__}: {str(e)}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            raise
-    return wrapper
-
-def log_task_status(name):
-    """Decorator to log task status"""
-    def decorator(f):
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            task_id = celery.current_task.request.id if celery.current_task else 'NO-ID'
-            logger.info(f"Task {name} [{task_id}] started")
-            try:
-                result = f(*args, **kwargs)
-                logger.info(f"Task {name} [{task_id}] completed successfully")
-                return result
-            except Exception as e:
-                error_msg = f"Task {name} [{task_id}] failed: {str(e)}\nTraceback: {traceback.format_exc()}"
-                logger.error(error_msg)
-                raise
-        return wrapper
-    return decorator
 
 def check_task_result(task, timeout=30):
     """Monitor task execution and return result"""
@@ -119,7 +59,7 @@ def check_mailhog():
         logger.error("Failed to check MailHog")
     return response.ok
 
-@celery.task(name='test_daily_reminders')
+@celery.task(name='tasks.test_daily_reminders')
 @ensure_context
 @log_task_status("test_daily_reminders")
 def test_daily_reminders():
@@ -167,7 +107,7 @@ def test_daily_reminders():
         logger.error(traceback.format_exc())
         raise
 
-@celery.task(name='test_monthly_reports')
+@celery.task(name='tasks.test_monthly_reports')
 @ensure_context
 @log_task_status("test_monthly_reports")
 def test_monthly_reports():
@@ -233,9 +173,8 @@ def test_tasks():
     task = test_monthly_reports.delay()
     results["Monthly Reports"] = check_task_result(task)
     
-    # Test exports (using original task from workers.py)
+    # Test exports
     print("\nTesting user export...")
-    from workers import generate_user_export
     task = generate_user_export.delay('admin@iitm.ac.in')
     results["User Export"] = check_task_result(task)
     
