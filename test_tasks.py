@@ -10,7 +10,6 @@ import io
 from flask_excel import init_excel, make_response_from_array
 import time
 import logging
-import charts
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -127,56 +126,57 @@ def check_mailhog():
 @ensure_context
 @log_task_status("test_daily_reminders")
 def test_daily_reminders():
-    """Test daily reminders task with actual logic"""
+    """Test daily reminders with full quiz information"""
     try:
         logger.info("Starting daily reminders test")
         from models import User, Quiz, Scores, Role
         from extensions import mail
         logger.info("Imports successful")
         
-        ist = pytz.timezone('Asia/Kolkata')
-        now = datetime.now(ist)
-        yesterday = now - timedelta(days=1)
-        
         # Find inactive users (excluding admins)
         inactive_users = User.query.join(User.roles).filter(
-            ~User.scores.any(Scores.time_stamp_of_attempt > yesterday),
             Role.name == 'user'
         ).limit(3).all()
         
-        logger.info(f"Found {len(inactive_users)} inactive users")
+        logger.info(f"Found {len(inactive_users)} users")
         
-        # Find new quizzes
-        new_quizzes = Quiz.query.filter(
-            Quiz.date_of_quiz > yesterday,
-            Quiz.date_of_quiz <= now
-        ).all()
+        # Get recent quizzes
+        new_quizzes = Quiz.query.all()
+        logger.info(f"Found {len(new_quizzes)} quizzes")
         
-        logger.info(f"Found {len(new_quizzes)} new quizzes")
         sent_count = 0
-        
         for user in inactive_users:
+            # Get user's scores
+            scores = user.scores
+            attempted_quizzes = {s.quiz_id for s in scores}
+            unattempted_quizzes = [q for q in new_quizzes if q.id not in attempted_quizzes]
+            
             message = Message(
                 'Quiz Master - Daily Update',
                 sender='quiz-master@example.com',
                 recipients=[user.email]
             )
             
-            if new_quizzes:
-                message.html = f"""
-                <h2>New Quizzes Available!</h2>
-                <p>Hello {user.full_name or user.email},</p>
-                <p>The following new quizzes have been added:</p>
-                <ul>
-                    {''.join(f'<li>{quiz.name} in {quiz.chapter.name}</li>' for quiz in new_quizzes)}
-                </ul>
-                """
-            else:
-                message.html = f"""
-                <h2>Daily Reminder</h2>
-                <p>Hello {user.full_name or user.email},</p>
-                <p>You haven't taken any quizzes in the last 24 hours. Don't forget to practice!</p>
-                """
+            html_content = [
+                f"<h2>Quiz Update for {user.full_name or user.email}</h2>",
+                "<h3>Your Quiz Status:</h3>",
+                f"<p>Total Quizzes Attempted: {len(scores)}</p>"
+            ]
+            
+            if unattempted_quizzes:
+                html_content.extend([
+                    "<h3>New Quizzes Available:</h3>",
+                    "<ul>"
+                ])
+                for quiz in unattempted_quizzes:
+                    html_content.append(
+                        f"<li><strong>{quiz.name}</strong> - {quiz.chapter.name}"
+                        f"<br>Questions: {len(quiz.questions)}"
+                        f"<br>Duration: {quiz.time_limit} minutes</li>"
+                    )
+                html_content.append("</ul>")
+            
+            message.html = "\n".join(html_content)
             
             try:
                 logger.info(f"Sending reminder to {user.email}")
@@ -188,7 +188,7 @@ def test_daily_reminders():
                 logger.error(traceback.format_exc())
                 raise
         
-        result = f"Reminders sent to {sent_count} inactive users"
+        result = f"Reminders sent to {sent_count} users"
         logger.info(result)
         return result
         
@@ -201,55 +201,81 @@ def test_daily_reminders():
 @ensure_context
 @log_task_status("test_monthly_reports")
 def test_monthly_reports():
-    """Test monthly reports task with actual logic"""
+    """Test monthly reports with detailed statistics"""
     try:
         logger.info("Starting monthly reports test")
-        from models import User, Scores
+        from models import User, Scores, Quiz, Subject
         from extensions import mail
         logger.info("Imports successful")
-        
-        ist = pytz.timezone('Asia/Kolkata')
-        now = datetime.now(ist)
-        last_month = now.replace(day=1) - timedelta(days=1)
-        month_start = last_month.replace(day=1)
         
         users = User.query.limit(3).all()
         logger.info(f"Processing reports for {len(users)} users")
         sent_count = 0
         
         for user in users:
-            monthly_scores = Scores.query.filter(
-                Scores.user_id == user.id,
-                Scores.time_stamp_of_attempt >= month_start,
-                Scores.time_stamp_of_attempt <= last_month
-            ).all()
+            # Get all user's scores
+            scores = user.scores
             
-            # Generate charts
-            logger.info(f"Generating charts for {user.email}")
-            charts.cleanup_charts()
-            attempts_chart = charts.generate_user_subject_attempts()(user.id)
-            performance_chart = charts.generate_user_performance_trend()(user.id)
+            # Get subject-wise performance
+            subject_scores = {}
+            for score in scores:
+                subject = score.quiz.chapter.subject
+                if subject.name not in subject_scores:
+                    subject_scores[subject.name] = {
+                        'total_score': 0,
+                        'count': 0,
+                        'best_score': 0
+                    }
+                
+                stats = subject_scores[subject.name]
+                stats['total_score'] += score.total_scored
+                stats['count'] += 1
+                stats['best_score'] = max(stats['best_score'], score.total_scored)
+            
+            # Build HTML report
+            html_content = [
+                f"<h1>Monthly Activity Report for {user.full_name or user.email}</h1>",
+                "<h2>Overall Statistics</h2>",
+                "<ul>",
+                f"<li>Total Quizzes Attempted: {len(scores)}</li>",
+                f"<li>Overall Average Score: {sum(s.total_scored for s in scores)/len(scores):.2f}% (if scores)</li>",
+                "</ul>",
+                "<h2>Subject-wise Performance</h2>"
+            ]
+            
+            for subject, stats in subject_scores.items():
+                avg_score = stats['total_score'] / stats['count']
+                html_content.extend([
+                    f"<h3>{subject}</h3>",
+                    "<ul>",
+                    f"<li>Quizzes Attempted: {stats['count']}</li>",
+                    f"<li>Average Score: {avg_score:.2f}%</li>",
+                    f"<li>Best Score: {stats['best_score']:.2f}%</li>",
+                    "</ul>"
+                ])
+            
+            # Recent activity
+            html_content.extend([
+                "<h2>Recent Quiz Activity</h2>",
+                "<table border='1'>",
+                "<tr><th>Quiz</th><th>Score</th><th>Date</th></tr>"
+            ])
+            
+            for score in sorted(scores, key=lambda s: s.time_stamp_of_attempt, reverse=True)[:5]:
+                html_content.append(
+                    f"<tr><td>{score.quiz.name}</td>"
+                    f"<td>{score.total_scored:.2f}%</td>"
+                    f"<td>{score.time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M')}</td></tr>"
+                )
+            
+            html_content.append("</table>")
             
             message = Message(
-                f'Monthly Activity Report - {last_month.strftime("%B %Y")}',
+                'Quiz Master - Monthly Activity Report',
                 sender='quiz-master@example.com',
                 recipients=[user.email]
             )
-            
-            total_quizzes = len(monthly_scores)
-            avg_score = sum(s.total_scored for s in monthly_scores) / total_quizzes if total_quizzes > 0 else 0
-            
-            message.html = f"""
-            <h1>Monthly Activity Report - {last_month.strftime("%B %Y")}</h1>
-            <p>Hello {user.full_name or user.email},</p>
-            
-            <h2>Your Activity Summary</h2>
-            <ul>
-                <li>Total Quizzes Completed: {total_quizzes}</li>
-                <li>Average Score: {avg_score:.2f}%</li>
-                <li>Best Score: {max((s.total_scored for s in monthly_scores), default=0):.2f}%</li>
-            </ul>
-            """
+            message.html = "\n".join(html_content)
             
             try:
                 logger.info(f"Sending report to {user.email}")
@@ -274,10 +300,10 @@ def test_monthly_reports():
 @ensure_context
 @log_task_status("test_user_export")
 def test_user_export(admin_email):
-    """Test user export task with actual logic"""
+    """Test user export with comprehensive data"""
     try:
         logger.info("Starting export test")
-        from models import User
+        from models import User, Subject
         from extensions import mail
         logger.info("Imports successful")
         
@@ -288,25 +314,54 @@ def test_user_export(admin_email):
             logger.error(error_msg)
             raise ValueError('Unauthorized access')
         
-        # Get all users for export
         users = User.query.all()
         logger.info(f"Exporting data for {len(users)} users")
         
-        data = [['User ID', 'Name', 'Email', 'Total Quizzes', 'Average Score', 'Last Quiz Date']]
+        # Get all subjects for per-subject stats
+        subjects = Subject.query.all()
+        subject_names = [s.name for s in subjects]
+        
+        # Prepare headers
+        headers = [
+            'User ID', 'Name', 'Email', 
+            'Total Quizzes', 'Overall Average', 'Best Score',
+            'Last Quiz Date'
+        ]
+        # Add per-subject columns
+        for subject in subject_names:
+            headers.extend([
+                f"{subject} Quizzes",
+                f"{subject} Average",
+                f"{subject} Best"
+            ])
+        
+        data = [headers]
+        
         for user in users:
             scores = user.scores
-            total_quizzes = len(scores)
-            avg_score = sum(s.total_scored for s in scores)/total_quizzes if total_quizzes > 0 else 0
-            last_quiz = max((s.time_stamp_of_attempt for s in scores), default=None) if scores else None
-            
-            data.append([
+            user_row = [
                 user.id,
                 user.full_name or 'N/A',
                 user.email,
-                total_quizzes,
-                f"{avg_score:.2f}",
-                last_quiz.strftime('%Y-%m-%d %H:%M:%S') if last_quiz else 'Never'
-            ])
+                len(scores),
+                f"{sum(s.total_scored for s in scores)/len(scores):.2f}%" if scores else "0%",
+                f"{max(s.total_scored for s in scores):.2f}%" if scores else "0%",
+                scores[-1].time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M') if scores else 'Never'
+            ]
+            
+            # Add subject-wise stats
+            for subject in subject_names:
+                subject_scores = [
+                    s for s in scores 
+                    if s.quiz.chapter.subject.name == subject
+                ]
+                user_row.extend([
+                    len(subject_scores),
+                    f"{sum(s.total_scored for s in subject_scores)/len(subject_scores):.2f}%" if subject_scores else "0%",
+                    f"{max(s.total_scored for s in subject_scores):.2f}%" if subject_scores else "0%"
+                ])
+            
+            data.append(user_row)
         
         # Generate CSV
         logger.info("Generating CSV file...")
@@ -318,12 +373,19 @@ def test_user_export(admin_email):
             sender='quiz-master@example.com',
             recipients=[admin_email]
         )
+        
         message.html = f"""
         <h2>User Data Export</h2>
-        <p>Your requested export is attached.</p>
+        <p>Your requested export is attached. It contains:</p>
+        <ul>
+            <li>Overall user statistics</li>
+            <li>Subject-wise performance breakdown</li>
+            <li>Total of {len(users)} users</li>
+            <li>Data for {len(subject_names)} subjects</li>
+        </ul>
         <p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        <p>Total users: {len(users)}</p>
         """
+        
         message.attach(
             "user_export.csv",
             "text/csv",
