@@ -7,7 +7,7 @@ import traceback
 import os
 import sys
 import io
-from flask_excel import init_excel
+from flask_excel import init_excel, make_response_from_array
 import time
 import logging
 
@@ -133,7 +133,7 @@ def test_daily_reminders():
         from extensions import mail
         logger.info("Imports successful")
         
-        # Get users to test with - simplified query
+        # Get users to test with
         users = User.query.limit(3).all()
         logger.info(f"Found {len(users)} users for testing")
         sent_count = 0
@@ -218,6 +218,63 @@ def test_monthly_reports():
         logger.error(traceback.format_exc())
         raise
 
+@test_celery.task(name='test.user_export')
+@ensure_context
+@log_task_status("test_user_export")
+def test_user_export(admin_email):
+    """Test user export task"""
+    try:
+        logger.info("Starting test export")
+        from models import User
+        from extensions import mail
+        logger.info("Imports successful")
+        
+        # Get users to test with
+        users = User.query.limit(3).all()
+        logger.info(f"Found {len(users)} users for testing")
+        
+        data = [['User ID', 'Name', 'Email', 'Total Quizzes']]
+        for user in users:
+            data.append([
+                user.id,
+                user.full_name or 'N/A',
+                user.email,
+                len(user.scores)
+            ])
+        
+        # Generate CSV
+        logger.info("Generating CSV file...")
+        excel_file = make_response_from_array(data, "csv")
+        
+        # Send email
+        message = Message(
+            'Test User Data Export',
+            sender='quiz-master@example.com',
+            recipients=[admin_email]
+        )
+        message.html = f"""
+        <h2>Test User Data Export</h2>
+        <p>This is a test export.</p>
+        <p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        """
+        message.attach(
+            "test_export.csv",
+            "text/csv",
+            excel_file.get_data()
+        )
+        
+        logger.info(f"Sending export email to {admin_email}")
+        mail.send(message)
+        
+        result = "Test export completed and sent"
+        logger.info(result)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in test_user_export: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
+
 def run_test_task(task_func, *args, **kwargs):
     """Run a task and monitor its execution"""
     task = task_func.delay(*args, **kwargs)
@@ -239,10 +296,9 @@ def test_tasks():
     print("\nTesting monthly reports...")
     results["Monthly Reports"] = run_test_task(test_monthly_reports)
     
-    # Test exports (using original task)
+    # Test exports
     print("\nTesting user export...")
-    from workers import generate_user_export
-    results["User Export"] = run_test_task(generate_user_export, 'admin@iitm.ac.in')
+    results["User Export"] = run_test_task(test_user_export, 'admin@iitm.ac.in')
     
     # Verify emails were sent
     check_mailhog()
