@@ -1,6 +1,6 @@
 from celery import Celery
 from celery.schedules import crontab
-from flask_excel import make_response_from_array
+from flask_excel import make_response_from_array, init_excel
 from datetime import datetime, timedelta
 from flask_mail import Message
 import pytz
@@ -8,6 +8,7 @@ from functools import wraps
 import traceback
 import os
 import sys
+import io
 
 # Ensure app directory is in path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -54,6 +55,8 @@ def get_flask_app():
         from app import create_app
         flask_app = create_app()
         print("Flask app created successfully")  # Debug log
+        # Initialize flask-excel with the app
+        init_excel(flask_app)
         return flask_app
     except Exception as e:
         print(f"Error creating Flask app: {str(e)}")  # Debug log
@@ -91,6 +94,23 @@ def log_task_status(name):
                 raise
         return wrapper
     return decorator
+
+def generate_csv(data):
+    """Generate CSV data from array"""
+    try:
+        response = make_response_from_array(data, "csv")
+        if response and hasattr(response, 'get_data'):
+            return response.get_data()
+        else:
+            # Fallback to manual CSV generation
+            print("Falling back to manual CSV generation")  # Debug log
+            output = io.StringIO()
+            for row in data:
+                output.write(','.join(str(cell) for cell in row) + '\n')
+            return output.getvalue().encode('utf-8')
+    except Exception as e:
+        print(f"CSV generation error: {str(e)}")  # Debug log
+        raise
 
 @celery.task(ignore_result=False)
 @ensure_context
@@ -136,7 +156,7 @@ def generate_user_export(admin_email):
     try:
         # Generate CSV
         print("Generating CSV file...")  # Debug log
-        excel_file = make_response_from_array(data, "csv")
+        csv_data = generate_csv(data)
         
         # Send email
         message = Message(
@@ -152,7 +172,7 @@ def generate_user_export(admin_email):
         message.attach(
             "user_export.csv",
             "text/csv",
-            excel_file.get_data()
+            csv_data
         )
         
         print(f"Sending export email to {admin_email}")  # Debug log
