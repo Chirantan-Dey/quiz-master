@@ -158,48 +158,45 @@ def generate_user_subject_questions():
     
     return os.path.basename(filepath)
 
-def generate_user_subject_attempts():
+def generate_user_subject_attempts(user_id):
     """Generate pie chart for subject-wise user attempts for current user"""
     timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
     filepath = os.path.join(USER_CHARTS_DIR, f'user_attempts_{timestamp}.png')
     
-    def generate_for_user(user_id):
-        # Get subject-wise attempt counts for the user
-        result = db.session.query(
-            Subject.name,
-            func.count(Scores.id).label('attempt_count')
-        ).join(
-            Chapter, Subject.id == Chapter.subject_id
-        ).join(
-            Quiz, Chapter.id == Quiz.chapter_id
-        ).join(
-            Scores, Quiz.id == Scores.quiz_id
-        ).filter(
-            Scores.user_id == user_id
-        ).group_by(
-            Subject.name
-        ).all()
-        
-        if not result:
-            return None
-        
-        subjects = [r[0] for r in result]
-        attempts = [r[1] if r[1] is not None else 0 for r in result]
-        
-        if not subjects or not attempts or sum(attempts) == 0:
-            return None
-        
-        # Clear any existing plots
-        plt.clf()
-        
-        # Create pie chart
-        fig = plt.figure(figsize=(10, 8))
-        plt.pie(attempts, labels=subjects, autopct='%1.1f%%')
-        plt.axis('equal')
-        plt.tight_layout()
-        plt.savefig(filepath)
-        plt.close(fig)
-        
-        return os.path.basename(filepath)
+    # Get subject-wise attempt counts for the user
+    result = db.session.query(
+        Subject.name,
+        func.count(Scores.id).label('attempt_count')
+    ).join(
+        Chapter, Subject.id == Chapter.subject_id
+    ).join(
+        Quiz, Chapter.id == Quiz.chapter_id
+    ).join(
+        Scores, Quiz.id == Scores.quiz_id
+    ).filter(
+        Scores.user_id == user_id
+    ).group_by(
+        Subject.name
+    ).all()
     
-    return generate_for_user
+    if not result:
+        return None
+    
+    subjects = [r[0] for r in result]
+    attempts = [r[1] if r[1] is not None else 0 for r in result]
+    
+    if not subjects or not attempts or sum(attempts) == 0:
+        return None
+    
+    # Clear any existing plots
+    plt.clf()
+    
+    # Create pie chart
+    fig = plt.figure(figsize=(10, 8))
+    plt.pie(attempts, labels=subjects, autopct='%1.1f%%')
+    plt.axis('equal')
+    plt.tight_layout()
+    plt.savefig(filepath)
+    plt.close(fig)
+    
+    return os.path.basename(filepath)

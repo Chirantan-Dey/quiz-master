@@ -9,7 +9,6 @@ from flask import current_app
 parser = reqparse.RequestParser()
 api = Api(prefix='/api')
 
-# Field definitions
 subject_fields = {
     'id': fields.Integer,
     'name': fields.String
@@ -237,12 +236,8 @@ class ExportResource(Resource):
     def post(self):
         """Start a background task to export user data"""
         try:
-            # Start the export task
-            task = generate_user_export.delay(current_user.email)
-            
-            # Clear the cache for this endpoint
-            cache.delete('export_task')
-            
+            task = generate_user_export.delay(current_user.email)            
+            cache.delete('export_task')            
             return {
                 'message': 'Export started. You will receive an email when ready.',
                 'task_id': str(task.id)
@@ -254,7 +249,7 @@ class ExportResource(Resource):
                 'message': f'Export failed: {str(e)}'
             }, 500
 
-# Add resources to API
+
 api.add_resource(SubjectResource, '/subjects', '/subjects/<int:id>')
 api.add_resource(QuizResource, '/quizzes', '/quizzes/<int:id>')
 api.add_resource(QuestionResource, '/questions', '/questions/<int:id>')

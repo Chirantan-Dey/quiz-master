@@ -84,6 +84,7 @@ const HomeAdmin = {
             isSubjectModalActive: false,
             editingChapter: null,
             chapterName: '',
+            chapterDescription: '',
             subjectName: '',
             subjectDescription: '',
             selectedSubjectName: '',

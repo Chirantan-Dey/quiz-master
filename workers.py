@@ -13,10 +13,8 @@ import io
 # Ensure app directory is in path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Create Celery instance without direct app dependency
 celery = Celery('quiz_master')
 
-# Default configuration
 class Config:
     CELERY_BROKER_URL = 'redis://localhost:6379/1'
     CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
@@ -51,16 +49,16 @@ celery.conf.update(
 def get_flask_app():
     """Get Flask app instance"""
     try:
-        print("Creating Flask app...")  # Debug log
+        print("Creating Flask app...")  
         from app import create_app
         flask_app = create_app()
-        print("Flask app created successfully")  # Debug log
+        print("Flask app created successfully")  
         # Initialize flask-excel with the app
         init_excel(flask_app)
         return flask_app
     except Exception as e:
-        print(f"Error creating Flask app: {str(e)}")  # Debug log
-        print(f"Python path: {sys.path}")  # Debug log
+        print(f"Error creating Flask app: {str(e)}")  
+        print(f"Python path: {sys.path}")  
         raise
 
 def ensure_context(f):
@@ -70,10 +68,10 @@ def ensure_context(f):
         try:
             flask_app = get_flask_app()
             with flask_app.app_context():
-                print(f"Executing task with app context: {f.__name__}")  # Debug log
+                print(f"Executing task with app context: {f.__name__}")  
                 return f(*args, **kwargs)
         except Exception as e:
-            print(f"Context error in {f.__name__}: {str(e)}")  # Debug log
+            print(f"Context error in {f.__name__}: {str(e)}")  
             raise
     return wrapper
 
@@ -83,14 +81,14 @@ def log_task_status(name):
         @wraps(f)
         def wrapper(*args, **kwargs):
             task_id = celery.current_task.request.id if celery.current_task else 'NO-ID'
-            print(f"Task {name} [{task_id}] started")  # Debug log
+            print(f"Task {name} [{task_id}] started")  
             try:
                 result = f(*args, **kwargs)
-                print(f"Task {name} [{task_id}] completed successfully")  # Debug log
+                print(f"Task {name} [{task_id}] completed successfully")  
                 return result
             except Exception as e:
                 error_msg = f"Task {name} [{task_id}] failed: {str(e)}\nTraceback: {traceback.format_exc()}"
-                print(error_msg)  # Debug log
+                print(error_msg)  
                 raise
         return wrapper
     return decorator
@@ -162,13 +160,13 @@ def generate_csv(data):
             return response.get_data()
         else:
             # Fallback to manual CSV generation
-            print("Falling back to manual CSV generation")  # Debug log
+            print("Falling back to manual CSV generation")  
             output = io.StringIO()
             for row in data:
                 output.write(','.join(str(cell) for cell in row) + '\n')
             return output.getvalue().encode('utf-8')
     except Exception as e:
-        print(f"CSV generation error: {str(e)}")  # Debug log
+        print(f"CSV generation error: {str(e)}")  
         raise
 
 @celery.task(ignore_result=False)
@@ -179,7 +177,6 @@ def send_daily_reminders():
     from models import User, Quiz, Role
     from extensions import mail
     
-    # Find users (excluding admins)
     users = User.query.join(User.roles).filter(
         Role.name == 'user'
     ).all()
@@ -190,7 +187,6 @@ def send_daily_reminders():
             scores = user.scores
             attempted_quiz_ids = {s.quiz_id for s in scores}
             
-            # Get unattempted quizzes
             quizzes = Quiz.query.all()
             unattempted = [q for q in quizzes if q.id not in attempted_quiz_ids]
             
@@ -240,7 +236,7 @@ def send_daily_reminders():
             
             mail.send(message)
             sent_count += 1
-            print(f"Reminder sent to {user.email}")  # Debug log
+            print(f"Reminder sent to {user.email}")  
         except Exception as e:
             print(f"Failed to send reminder to {user.email}: {str(e)}")
             print(traceback.format_exc())
@@ -264,7 +260,6 @@ def send_monthly_reports():
         try:
             scores = user.scores
             
-            # Get subject-wise performance
             subject_stats = {}
             for score in scores:
                 subject = score.quiz.chapter.subject
@@ -282,7 +277,6 @@ def send_monthly_reports():
                 stats['best_score'] = max(stats['best_score'], score.total_scored)
                 stats['scores'].append(score)
             
-            # Build HTML content
             html_content = [
                 "<div class='stats'>",
                 "<h2>Overall Performance</h2>",
@@ -345,7 +339,7 @@ def send_monthly_reports():
             
             mail.send(message)
             sent_count += 1
-            print(f"Report sent to {user.email}")  # Debug log
+            print(f"Report sent to {user.email}")  
         except Exception as e:
             print(f"Failed to send report to {user.email}: {str(e)}")
             print(traceback.format_exc())
@@ -361,21 +355,17 @@ def generate_user_export(admin_email):
     from models import User, Subject, Role
     from extensions import mail
     
-    # Verify admin role
     admin_user = User.query.filter_by(email=admin_email).first()
     if not admin_user or 'admin' not in [role.name for role in admin_user.roles]:
         raise ValueError('Unauthorized access')
     
-    # Get non-admin users
     users = User.query.join(User.roles).filter(
         Role.name == 'user'
     ).all()
     
-    # Get subjects for per-subject stats
     subjects = Subject.query.all()
     subject_names = [s.name for s in subjects]
     
-    # Prepare headers
     headers = [
         'User ID', 'Name', 'Email',
         'Total Quizzes', 'Overall Average', 'Best Score',
@@ -404,7 +394,6 @@ def generate_user_export(admin_email):
             user.email,
         ]
         
-        # Overall stats
         if scores:
             row.extend([
                 len(scores),
@@ -417,7 +406,6 @@ def generate_user_export(admin_email):
         else:
             row.extend(['0', '0%', '0%', '0', 'N/A', 'Never'])
         
-        # Subject-wise stats
         for subject in subject_names:
             subject_scores = [s for s in scores if s.quiz.chapter.subject.name == subject]
             recent_subject = [s for s in subject_scores if s.time_stamp_of_attempt >= week_ago]

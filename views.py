@@ -2,7 +2,7 @@ from flask import render_template_string, render_template, Flask, request, jsoni
 from flask_security import auth_required, current_user, roles_required
 from flask_security import SQLAlchemySessionUserDatastore
 from flask_security.utils import hash_password
-from models import Subject, Chapter, Quiz, Questions
+from models import Subject, Chapter, Quiz, Questions, Scores
 from extensions import cache
 import charts
 import os
@@ -66,7 +66,7 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
 
     @app.route('/api/subjects')
     @auth_required('token', 'session')
-    @cache.memoize(timeout=1)  # Cache for 1 second
+    @cache.memoize(timeout=1)
     def get_subjects():
         search_query = request.args.get('search', '').lower()
         subjects = db.session.query(Subject).all()
@@ -100,7 +100,7 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
 
     @app.route('/api/quizzes')
     @auth_required('token', 'session')
-    @cache.memoize(timeout=1)  # Cache for 1 second
+    @cache.memoize(timeout=1)  
     def get_quizzes():
         search_query = request.args.get('search', '').lower()
         quizzes = db.session.query(Quiz)
@@ -217,13 +217,12 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
     @app.route('/api/charts/admin')
     @auth_required('token', 'session')
     @roles_required('admin')
-    @cache.memoize(timeout=1)  # Cache for 1 second
+    @cache.memoize(timeout=1)  
     def get_admin_charts():
         try:
             # Clean up old charts first
             charts.cleanup_charts()
             
-            # Generate new charts
             scores_chart = charts.generate_admin_subject_scores()
             if not scores_chart:
                 return jsonify({'message': 'No score data available'}), 404
@@ -242,23 +241,20 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
 
     @app.route('/api/charts/user')
     @auth_required('token', 'session')
-    @cache.memoize(timeout=1)  # Cache for 1 second
+    @cache.memoize(timeout=1)  
     def get_user_charts():
         try:
             # Clean up old charts first
             charts.cleanup_charts()
             
-            # Generate new charts with user_id for attempts
             questions_chart = charts.generate_user_subject_questions()
             attempts_chart = charts.generate_user_subject_attempts(current_user.id)
             
-            # Check chart generation results
             if not questions_chart:
                 return jsonify({'message': 'No questions data available'}), 404
             if not attempts_chart:
                 return jsonify({'message': 'No quiz attempts found'}), 404
             
-            # Return chart paths
             return jsonify({
                 'questions_chart': f'/static/charts/user/{questions_chart}',
                 'attempts_chart': f'/static/charts/user/{attempts_chart}'
@@ -266,3 +262,119 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
         except Exception as e:
             app.logger.error(f"Error generating user charts: {str(e)}")
             return jsonify({'message': 'Error generating charts'}), 500
+
+    @app.route('/api/questions/<int:question_id>', methods=['PUT'])
+    @auth_required('token', 'session')
+    def update_question(question_id):
+        try:
+            data = request.get_json()
+            question = db.session.query(Questions).filter(Questions.id == question_id).first()
+            
+            if not question:
+                return jsonify({'message': 'Question not found'}), 404
+                
+            # Validate required fields
+            required_fields = ['question_statement', 'option1', 'option2', 'correct_answer']
+            if not all(field in data for field in required_fields):
+                return jsonify({'message': 'Missing required fields'}), 400
+            
+            question.question_statement = data['question_statement']
+            question.option1 = data['option1']
+            question.option2 = data['option2']
+            question.correct_answer = data['correct_answer']
+            
+            db.session.commit()
+            
+            # Invalidate quiz cache
+            cache.delete_memoized(get_quizzes)
+            
+            return jsonify({
+                'message': 'Question updated successfully',
+                'question': {
+                    'id': question.id,
+                    'question_statement': question.question_statement,
+                    'option1': question.option1,
+                    'option2': question.option2,
+                    'correct_answer': question.correct_answer
+                }
+            })
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating question: {str(e)}")
+            return jsonify({'message': 'Failed to update question'}), 500
+
+    @app.route('/api/questions/<int:question_id>', methods=['DELETE'])
+    @auth_required('token', 'session')
+    def delete_question(question_id):
+        try:
+            question = db.session.query(Questions).filter(Questions.id == question_id).first()
+            
+            if not question:
+                return jsonify({'message': 'Question not found'}), 404
+            
+            db.session.delete(question)
+            db.session.commit()
+            
+            # Invalidate quiz cache
+            cache.delete_memoized(get_quizzes)
+            
+            return jsonify({'message': 'Question deleted successfully'})
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error deleting question: {str(e)}")
+            return jsonify({'message': 'Failed to delete question'}), 500
+            
+    @app.route('/api/scores', methods=['POST'])
+    @auth_required('token', 'session')
+    def submit_score():
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            required_fields = ['quiz_id', 'time_stamp_of_attempt', 'total_scored']
+            if not all(field in data for field in required_fields):
+                return jsonify({'message': 'Missing required fields'}), 400
+                
+            # Validate data types
+            if not isinstance(data['quiz_id'], (int, float)):
+                return jsonify({'message': 'quiz_id must be a number'}), 400
+            
+            if not isinstance(data['total_scored'], (int, float)):
+                return jsonify({'message': 'total_scored must be a number'}), 400
+                
+            # Parse and validate timestamp
+            try:
+                timestamp = datetime.fromisoformat(data['time_stamp_of_attempt'].replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'message': 'Invalid timestamp format'}), 400
+            
+            # Validate quiz exists
+            quiz = db.session.query(Quiz).filter(Quiz.id == data['quiz_id']).first()
+            if not quiz:
+                return jsonify({'message': 'Quiz not found'}), 404
+            
+            score = Scores(
+                quiz_id=data['quiz_id'],
+                user_id=current_user.id,
+                time_stamp_of_attempt=timestamp,
+                total_scored=data['total_scored']
+            )
+            
+            db.session.add(score)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Score submitted successfully',
+                'score': {
+                    'id': score.id,
+                    'quiz_id': score.quiz_id,
+                    'user_id': score.user_id,
+                    'time_stamp_of_attempt': score.time_stamp_of_attempt.isoformat(),
+                    'total_scored': score.total_scored
+                }
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error submitting score: {str(e)}")
+            return jsonify({'message': 'Failed to submit score'}), 500
