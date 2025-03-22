@@ -160,11 +160,12 @@ const QuizAdmin = {
                                 <input
                                     type="number"
                                     class="form-control"
-                                    v-model="timeDuration"
+                                    v-model.number="timeDuration"
                                     placeholder="Time Duration"
                                     required
                                     min="1"
                                     max="180"
+                                    @input="validateQuizField('duration')"
                                 >
                                 <div v-if="quizFieldErrors.duration" class="text-danger small mt-1">{{ quizFieldErrors.duration }}</div>
                             </div>
@@ -218,7 +219,7 @@ const QuizAdmin = {
             selectedQuizId: null,
             chapterId: '',
             dateOfQuiz: '',
-            timeDuration: '',
+            timeDuration: 0,
             remarks: '',
             chapters: [],
             questionModal: null,
@@ -247,7 +248,7 @@ const QuizAdmin = {
             this.quizName = '';
             this.chapterId = '';
             this.dateOfQuiz = '';
-            this.timeDuration = '';
+            this.timeDuration = 0;
             this.remarks = '';
         },
         async fetchQuizzes() {
@@ -482,7 +483,7 @@ const QuizAdmin = {
                     this.quizFieldErrors.date = 'Date cannot be in the past';
                     return;
                 }
-                
+
                 const response = await fetch('/api/quizzes', {
                     method: 'POST',
                     headers: {
@@ -491,10 +492,10 @@ const QuizAdmin = {
                     },
                     body: JSON.stringify({
                         name: this.quizName,
-                        chapter_id: this.chapterId,
-                        date_of_quiz: dateObject,
-                        time_duration: this.timeDuration,
-                        remarks: this.remarks
+                        chapter_id: parseInt(this.chapterId),
+                        date_of_quiz: dateObject.toISOString(),
+                        time_duration: parseInt(this.timeDuration),
+                        remarks: this.remarks || ''
                     }),
                 });
 

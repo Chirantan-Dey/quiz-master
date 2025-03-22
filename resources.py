@@ -114,25 +114,31 @@ class QuizResource(Resource):
     def post(self):
         parser.add_argument('name', type=str, required=True)
         parser.add_argument('chapter_id', type=int, required=True)
-        parser.add_argument('date_of_quiz', type=str, required=False)
-        parser.add_argument('time_duration', type=int, required=False)
+        parser.add_argument('date_of_quiz', type=str, required=True)
+        parser.add_argument('time_duration', type=str, required=True)  # Changed to str to match frontend
         parser.add_argument('remarks', type=str, required=False)
         args = parser.parse_args()
         
+        # Convert time_duration to int and validate
+        try:
+            time_duration = int(args.get('time_duration'))
+            if time_duration <= 0:
+                return {"message": "Duration must be a positive number"}, 400
+        except (ValueError, TypeError):
+            return {"message": "Duration must be a valid number"}, 400
+            
         date_of_quiz_str = args.get('date_of_quiz')
-        if date_of_quiz_str:
-            try:
-                date_of_quiz = datetime.strptime(date_of_quiz_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-            except ValueError:
-                return {"message": "Invalid date format"}, 400
-        else:
-            date_of_quiz = None
+        try:
+            # Handle ISO format date string from frontend
+            date_of_quiz = datetime.strptime(date_of_quiz_str.split('.')[0], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            return {"message": "Invalid date format"}, 400
 
         quiz = Quiz(
             name=args.get('name'),
             chapter_id=args.get('chapter_id'),
             date_of_quiz=date_of_quiz,
-            time_duration=args.get('time_duration'),
+            time_duration=time_duration,  # Use converted integer
             remarks=args.get('remarks')
         )
         db.session.add(quiz)
@@ -229,26 +235,39 @@ class ChapterResource(Resource):
         cache.delete('chapter_list')
         return chapter
 
+    @auth_required('token', 'session')
+    def delete(self, id):
+        chapter = Chapter.query.get(id)
+        if not chapter:
+            return {"message": "Chapter not found"}, 404
+        try:
+            db.session.delete(chapter)
+            db.session.commit()
+            cache.delete('chapter_list')
+            return {"message": "Chapter deleted"}, 200
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Delete chapter error: {str(e)}")
+            return {"message": "Failed to delete chapter"}, 500
+
 class ExportResource(Resource):
     @auth_required('token', 'session')
     @roles_required('admin')
-    @cache.cached(timeout=1, key_prefix='export_task')
     def post(self):
         """Start a background task to export user data"""
+        task = None
         try:
             task = generate_user_export.delay(current_user.email)            
             cache.delete('export_task')            
             return {
                 'message': 'Export started. You will receive an email when ready.',
-                'task_id': str(task.id)
+                'task_id': str(task.id) if task else None
             }, 202
-            
         except Exception as e:
             current_app.logger.error(f"Export error: {str(e)}")
             return {
                 'message': f'Export failed: {str(e)}'
             }, 500
-
 
 api.add_resource(SubjectResource, '/subjects', '/subjects/<int:id>')
 api.add_resource(QuizResource, '/quizzes', '/quizzes/<int:id>')

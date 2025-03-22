@@ -3,7 +3,7 @@ const OFFLINE_URL = '/offline.html';
 const ASSETS_TO_CACHE = [
     '/',
     '/static/app.js',
-    '/static/styles.css',
+    '/static/style.css',
     '/static/manifest.json',
     OFFLINE_URL,
     'https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.js',
