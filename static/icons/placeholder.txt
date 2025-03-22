@@ -1,0 +1,11 @@
+You need to create two icon files here:
+
+1. icon-192x192.png (192x192 pixels)
+2. icon-512x512.png (512x512 pixels)
+
+These should be your app logo at different sizes. For now, you can use any simple icon or create one with a tool like Figma, Adobe XD, or a free icon generator.
+
+Example properties:
+- Format: PNG with transparency
+- Colors: Use your theme color (#563d7c)
+- Content: Could be "QM" or a quiz-related symbol

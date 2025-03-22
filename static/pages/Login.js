@@ -7,22 +7,26 @@ const Login = {
         <h3 class="card-title text-center mb-4">Login</h3>
         <form @submit.prevent="submitInfo">
           <div class="form-group mb-3">
-            <input 
-              v-model="email" 
-              type="email" 
-              class="form-control" 
-              placeholder="Email" 
+            <input
+              v-model="email"
+              type="email"
+              class="form-control"
+              placeholder="Email"
               required
+              @input="validateEmail"
             />
+            <div v-if="emailError" class="text-danger small mt-1">{{ emailError }}</div>
           </div>
           <div class="form-group mb-4">
-            <input 
-              v-model="password" 
-              type="password" 
-              class="form-control" 
-              placeholder="Password" 
+            <input
+              v-model="password"
+              type="password"
+              class="form-control"
+              placeholder="Password"
               required
+              @input="validatePassword"
             />
+            <div v-if="passwordError" class="text-danger small mt-1">{{ passwordError }}</div>
           </div>
           <div v-if="error" class="alert alert-danger mb-3">
             {{ error }}
@@ -44,14 +48,42 @@ const Login = {
       email: "",
       password: "",
       error: "",
+      emailError: "",
+      passwordError: "",
       isLoading: false
     };
   },
   methods: {
+    validateEmail() {
+      if (!this.email) {
+        this.emailError = "Email is required";
+      } else if (!this.email.includes('@')) {
+        this.emailError = "Please enter a valid email address";
+      } else {
+        this.emailError = "";
+      }
+    },
+    validatePassword() {
+      if (!this.password) {
+        this.passwordError = "Password is required";
+      } else {
+        this.passwordError = "";
+      }
+    },
+    validateForm() {
+      this.validateEmail();
+      this.validatePassword();
+      return !this.emailError && !this.passwordError;
+    },
     async submitInfo() {
       this.error = "";
-      this.isLoading = true;
       
+      // Validate form before submitting
+      if (!this.validateForm()) {
+        return;
+      }
+      
+      this.isLoading = true;
       try {
         const res = await fetch("/", {
           method: "POST",

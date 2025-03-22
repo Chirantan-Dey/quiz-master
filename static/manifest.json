@@ -1,0 +1,21 @@
+{
+    "name": "Quiz Master",
+    "short_name": "QuizMaster",
+    "description": "A quiz management application",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#563d7c",
+    "icons": [
+        {
+            "src": "icons/android-launchericon-192-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/android-launchericon-512-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

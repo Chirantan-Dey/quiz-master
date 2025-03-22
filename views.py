@@ -141,33 +141,62 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
     @app.route('/api/chapters', methods=['POST'])
     @auth_required('token', 'session')
     def create_chapter():
-        data = request.get_json()
-        name = data.get('name')
-        description = data.get('description')
-        subject_name = data.get('subject_name')
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            required_fields = ['name', 'description', 'subject_name']
+            if not all(field in data for field in required_fields):
+                return jsonify({'message': 'Missing required fields'}), 400
 
-        if not name or not description or not subject_name:
-            return jsonify({'message': 'Invalid input'}), 400
-        
-        subject = db.session.query(Subject).filter(Subject.name == subject_name).first()
-        if not subject:
-            return jsonify({'message': 'Subject not found'}), 404
+            name = data.get('name').strip()
+            description = data.get('description').strip()
+            subject_name = data.get('subject_name')
 
-        chapter = Chapter(name=name, description=description, subject_id=subject.id)
-        db.session.add(chapter)
-        db.session.commit()
-        
-        # Invalidate subject cache after adding new chapter
-        cache.delete_memoized(get_subjects)
-        
-        return jsonify({
-            'message': 'Chapter created successfully',
-            'chapter': {
-                'id': chapter.id,
-                'name': chapter.name,
-                'description': chapter.description
-            }
-        }), 201
+            # Basic validation
+            if not name.strip():
+                return jsonify({'message': 'Chapter name is required'}), 400
+            if not description.strip():
+                return jsonify({'message': 'Description is required'}), 400
+
+            # Validate subject exists
+            subject = db.session.query(Subject).filter(Subject.name == subject_name).first()
+            if not subject:
+                return jsonify({'message': 'Subject not found'}), 404
+
+            # Check for duplicate chapter names in the same subject
+            existing_chapter = db.session.query(Chapter).filter(
+                Chapter.subject_id == subject.id,
+                Chapter.name == name
+            ).first()
+            if existing_chapter:
+                return jsonify({'message': 'A chapter with this name already exists in the subject'}), 400
+
+            # Create and save chapter
+            chapter = Chapter(
+                name=name,
+                description=description,
+                subject_id=subject.id
+            )
+            db.session.add(chapter)
+            db.session.commit()
+            
+            # Invalidate subject cache after adding new chapter
+            cache.delete_memoized(get_subjects)
+            
+            return jsonify({
+                'message': 'Chapter created successfully',
+                'chapter': {
+                    'id': chapter.id,
+                    'name': chapter.name,
+                    'description': chapter.description
+                }
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error creating chapter: {str(e)}")
+            return jsonify({'message': 'Failed to create chapter'}), 500
 
     @app.route('/api/chapters/<int:chapter_id>', methods=['PUT'])
     @auth_required('token', 'session')
@@ -263,6 +292,131 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
             app.logger.error(f"Error generating user charts: {str(e)}")
             return jsonify({'message': 'Error generating charts'}), 500
 
+    @app.route('/api/quizzes', methods=['POST'])
+    @auth_required('token', 'session')
+    def create_quiz():
+        try:
+            data = request.get_json()
+            required_fields = ['name', 'chapter_id', 'date_of_quiz', 'time_duration']
+            if not all(field in data for field in required_fields):
+                return jsonify({'message': 'Missing required fields'}), 400
+            
+            # Basic validation
+            if not data['name'].strip():
+                return jsonify({'message': 'Quiz name is required'}), 400
+                
+            if not isinstance(data['chapter_id'], (int, float)):
+                return jsonify({'message': 'Invalid chapter ID'}), 400
+                
+            if not isinstance(data['time_duration'], (int, float)) or float(data['time_duration']) <= 0:
+                return jsonify({'message': 'Duration must be a positive number'}), 400
+            
+            try:
+                date_of_quiz = datetime.strptime(data['date_of_quiz'][:10], '%Y-%m-%d').date()
+                if date_of_quiz < datetime.now().date():
+                    return jsonify({'message': 'Quiz date cannot be in the past'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
+            
+            # Verify chapter exists
+            chapter = db.session.query(Chapter).get(data['chapter_id'])
+            if not chapter:
+                return jsonify({'message': 'Chapter not found'}), 404
+            
+            quiz = Quiz(
+                name=data['name'],
+                chapter_id=data['chapter_id'],
+                date_of_quiz=date_of_quiz,
+                time_duration=data['time_duration'],
+                remarks=data.get('remarks', '')
+            )
+            
+            db.session.add(quiz)
+            db.session.commit()
+            
+            # Invalidate quiz cache
+            cache.delete_memoized(get_quizzes)
+            
+            return jsonify({
+                'message': 'Quiz created successfully',
+                'quiz': {
+                    'id': quiz.id,
+                    'name': quiz.name,
+                    'chapter_id': quiz.chapter_id,
+                    'date_of_quiz': quiz.date_of_quiz.strftime('%Y-%m-%d'),
+                    'time_duration': quiz.time_duration,
+                    'remarks': quiz.remarks
+                }
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error creating quiz: {str(e)}")
+            return jsonify({'message': 'Failed to create quiz'}), 500
+            
+    @app.route('/api/questions', methods=['POST'])
+    @auth_required('token', 'session')
+    def create_question():
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            required_fields = ['question_statement', 'option1', 'option2', 'correct_answer', 'quiz_id']
+            if not all(field in data for field in required_fields):
+                return jsonify({'message': 'Missing required fields'}), 400
+
+            # Basic validation
+            if not data['question_statement'].strip():
+                return jsonify({'message': 'Question statement is required'}), 400
+            if not data['option1'].strip():
+                return jsonify({'message': 'Option 1 is required'}), 400
+            if not data['option2'].strip():
+                return jsonify({'message': 'Option 2 is required'}), 400
+            
+            # Validate quiz ID format
+            if not isinstance(data['quiz_id'], (int, float)):
+                return jsonify({'message': 'Invalid quiz ID'}), 400
+
+            # Validate correct answer matches one of the options
+            if data['correct_answer'] not in [data['option1'], data['option2']]:
+                return jsonify({'message': 'Correct answer must match one of the options'}), 400
+
+            # Validate quiz exists
+            quiz = db.session.query(Quiz).get(data['quiz_id'])
+            if not quiz:
+                return jsonify({'message': 'Quiz not found'}), 404
+
+            question = Questions(
+                quiz_id=data['quiz_id'],
+                question_statement=data['question_statement'].strip(),
+                option1=data['option1'].strip(),
+                option2=data['option2'].strip(),
+                correct_answer=data['correct_answer']
+            )
+            
+            db.session.add(question)
+            db.session.commit()
+            
+            # Invalidate quiz cache
+            cache.delete_memoized(get_quizzes)
+            
+            return jsonify({
+                'message': 'Question created successfully',
+                'question': {
+                    'id': question.id,
+                    'quiz_id': question.quiz_id,
+                    'question_statement': question.question_statement,
+                    'option1': question.option1,
+                    'option2': question.option2,
+                    'correct_answer': question.correct_answer
+                }
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error creating question: {str(e)}")
+            return jsonify({'message': 'Failed to create question'}), 500
+
     @app.route('/api/questions/<int:question_id>', methods=['PUT'])
     @auth_required('token', 'session')
     def update_question(question_id):
@@ -272,15 +426,31 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
             
             if not question:
                 return jsonify({'message': 'Question not found'}), 404
-                
-            # Validate required fields
-            required_fields = ['question_statement', 'option1', 'option2', 'correct_answer']
-            if not all(field in data for field in required_fields):
-                return jsonify({'message': 'Missing required fields'}), 400
-            
-            question.question_statement = data['question_statement']
-            question.option1 = data['option1']
-            question.option2 = data['option2']
+                # Validate required fields and content
+                required_fields = ['question_statement', 'option1', 'option2', 'correct_answer']
+                if not all(field in data for field in required_fields):
+                    return jsonify({'message': 'Missing required fields'}), 400
+    
+                # Validate question statement length (10-500 characters)
+                if len(data['question_statement'].strip()) < 10:
+                    return jsonify({'message': 'Question statement must be at least 10 characters'}), 400
+                if len(data['question_statement']) > 500:
+                    return jsonify({'message': 'Question statement must be less than 500 characters'}), 400
+    
+                # Validate options (1-200 characters each)
+                if not data['option1'].strip() or len(data['option1']) > 200:
+                    return jsonify({'message': 'Option 1 must be between 1 and 200 characters'}), 400
+                if not data['option2'].strip() or len(data['option2']) > 200:
+                    return jsonify({'message': 'Option 2 must be between 1 and 200 characters'}), 400
+    
+                # Validate correct answer matches one of the options
+                if data['correct_answer'] not in [data['option1'], data['option2']]:
+                    return jsonify({'message': 'Correct answer must match one of the options'}), 400
+    
+                question.question_statement = data['question_statement'].strip()
+                question.option1 = data['option1'].strip()
+                question.option2 = data['option2'].strip()
+                question.correct_answer = data['correct_answer']
             question.correct_answer = data['correct_answer']
             
             db.session.commit()

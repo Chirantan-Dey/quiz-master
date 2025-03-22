@@ -13,33 +13,35 @@ const QuizAdmin = {
         </div>
         <div v-for="quiz in filteredQuizzes" :key="quiz.name" class="mb-4">
             <h2>{{ quiz.name }}</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Question Statement</th>
-                        <th>Option 1</th>
-                        <th>Option 2</th>
-                        <th>Correct Answer</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <Question
-                        v-for="question in quiz.questions"
-                        :key="question.id"
-                        :question="question"
-                        :isAdmin="true"
-                        @edit="openEditQuestionModal"
-                        @delete="handleDeleteQuestion"
-                    />
-                    <tr>
-                        <td colspan="2">
-                            <button class="btn btn-sm btn-success" @click="openAddQuestionModal(quiz)">Add Question</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Question</th>
+                            <th class="d-none d-md-table-cell">Option 1</th>
+                            <th class="d-none d-md-table-cell">Option 2</th>
+                            <th class="d-none d-md-table-cell">Correct Answer</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <Question
+                            v-for="question in quiz.questions"
+                            :key="question.id"
+                            :question="question"
+                            :isAdmin="true"
+                            @edit="openEditQuestionModal"
+                            @delete="handleDeleteQuestion"
+                        />
+                        <tr>
+                            <td colspan="6">
+                                <button class="btn btn-sm btn-success" @click="openAddQuestionModal(quiz)">Add Question</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <button class="btn btn-primary" @click="openAddQuizModal">Add Quiz</button>
 
@@ -51,54 +53,63 @@ const QuizAdmin = {
                         <h5 class="modal-title" id="questionModalLabel" v-else>Add Question</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
-                        <div class="form-group mb-3">
-                            <label>Question Statement</label>
-                            <input
-                                type="text"
-                                class="form-control"
-                                v-model="questionData.question_statement"
-                                placeholder="Enter question statement"
-                                maxlength="500"
-                            >
-                            <small class="text-muted">Maximum 500 characters</small>
+                    <form @submit.prevent="saveQuestion">
+                        <div class="modal-body">
+                            <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
+                            <div class="form-group mb-3">
+                                <label>Question Statement</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    v-model="questionData.question_statement"
+                                    placeholder="Enter question statement"
+                                    required
+                                    @input="validateQuestionField('question_statement')"
+                                >
+                                <small class="text-muted">10-500 characters</small>
+                                <div v-if="fieldErrors.question_statement" class="text-danger small mt-1">{{ fieldErrors.question_statement }}</div>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label>Option 1</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    v-model="questionData.option1"
+                                    placeholder="Enter option 1"
+                                    required
+                                    @input="validateQuestionField('option1')"
+                                >
+                                <small class="text-muted">1-200 characters</small>
+                                <div v-if="fieldErrors.option1" class="text-danger small mt-1">{{ fieldErrors.option1 }}</div>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label>Option 2</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    v-model="questionData.option2"
+                                    placeholder="Enter option 2"
+                                    required
+                                    @input="validateQuestionField('option2')"
+                                >
+                                <small class="text-muted">1-200 characters</small>
+                                <div v-if="fieldErrors.option2" class="text-danger small mt-1">{{ fieldErrors.option2 }}</div>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label>Correct Answer</label>
+                                <select class="form-control" v-model="questionData.correct_answer" required>
+                                    <option value="">Select correct answer</option>
+                                    <option v-if="questionData.option1" :value="questionData.option1">{{ questionData.option1 }}</option>
+                                    <option v-if="questionData.option2" :value="questionData.option2">{{ questionData.option2 }}</option>
+                                </select>
+                                <div v-if="fieldErrors.correct_answer" class="text-danger small mt-1">{{ fieldErrors.correct_answer }}</div>
+                            </div>
                         </div>
-                        <div class="form-group mb-3">
-                            <label>Option 1</label>
-                            <input
-                                type="text"
-                                class="form-control"
-                                v-model="questionData.option1"
-                                placeholder="Enter option 1"
-                                maxlength="200"
-                            >
-                            <small class="text-muted">Maximum 200 characters</small>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
                         </div>
-                        <div class="form-group mb-3">
-                            <label>Option 2</label>
-                            <input
-                                type="text"
-                                class="form-control"
-                                v-model="questionData.option2"
-                                placeholder="Enter option 2"
-                                maxlength="200"
-                            >
-                            <small class="text-muted">Maximum 200 characters</small>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label>Correct Answer</label>
-                            <select class="form-control" v-model="questionData.correct_answer">
-                                <option value="">Select correct answer</option>
-                                <option v-if="questionData.option1" :value="questionData.option1">{{ questionData.option1 }}</option>
-                                <option v-if="questionData.option2" :value="questionData.option2">{{ questionData.option2 }}</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" @click="saveQuestion">Save</button>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -110,19 +121,68 @@ const QuizAdmin = {
                         <h5 class="modal-title" id="addQuizModalLabel">Add Quiz</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <input type="text" class="form-control" v-model="quizName" placeholder="Quiz Name"><br>
-                        <select class="form-control" v-model="chapterId">
-                            <option v-for="chapter in chapters" :key="chapter.id" :value="chapter.id">{{ chapter.name }}</option>
-                        </select><br>
-                        <input type="date" class="form-control" v-model="dateOfQuiz" placeholder="Date of Quiz"><br>
-                        <input type="number" class="form-control" v-model="timeDuration" placeholder="Time Duration(in minutes)"><br>
-                        <input type="text" class="form-control" v-model="remarks" placeholder="Remarks">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" @click="saveQuiz">Save</button>
-                    </div>
+                    <form @submit.prevent="saveQuiz">
+                        <div class="modal-body">
+                            <div v-if="quizError" class="alert alert-danger">{{ quizError }}</div>
+                            <div class="form-group mb-3">
+                                <label>Quiz Name</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    v-model="quizName"
+                                    placeholder="Quiz Name"
+                                    required
+                                    @input="validateQuizField('name')"
+                                >
+                                <div v-if="quizFieldErrors.name" class="text-danger small mt-1">{{ quizFieldErrors.name }}</div>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label>Chapter</label>
+                                <select class="form-control" v-model="chapterId" required>
+                                    <option value="">Select a chapter</option>
+                                    <option v-for="chapter in chapters" :key="chapter.id" :value="chapter.id">{{ chapter.name }}</option>
+                                </select>
+                                <div v-if="quizFieldErrors.chapter" class="text-danger small mt-1">{{ quizFieldErrors.chapter }}</div>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label>Date of Quiz</label>
+                                <input
+                                    type="date"
+                                    class="form-control"
+                                    v-model="dateOfQuiz"
+                                    required
+                                    :min="getCurrentDate()"
+                                >
+                                <div v-if="quizFieldErrors.date" class="text-danger small mt-1">{{ quizFieldErrors.date }}</div>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label>Duration (minutes)</label>
+                                <input
+                                    type="number"
+                                    class="form-control"
+                                    v-model="timeDuration"
+                                    placeholder="Time Duration"
+                                    required
+                                    min="1"
+                                    max="180"
+                                >
+                                <div v-if="quizFieldErrors.duration" class="text-danger small mt-1">{{ quizFieldErrors.duration }}</div>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label>Remarks</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    v-model="remarks"
+                                    placeholder="Remarks"
+                                >
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -141,6 +201,19 @@ const QuizAdmin = {
                 correct_answer: ''
             },
             formError: '',
+            fieldErrors: {
+                question_statement: '',
+                option1: '',
+                option2: '',
+                correct_answer: ''
+            },
+            quizError: '',
+            quizFieldErrors: {
+                name: '',
+                chapter: '',
+                date: '',
+                duration: ''
+            },
             quizName: '',
             selectedQuizId: null,
             chapterId: '',
@@ -239,30 +312,24 @@ const QuizAdmin = {
             this.questionModal.hide();
         },
         validateQuestionData() {
-            if (!this.questionData.question_statement.trim()) {
-                this.formError = 'Question statement is required';
-                return false;
+            const fields = {
+                'question_statement': 'Question',
+                'option1': 'Option 1',
+                'option2': 'Option 2'
+            };
+            
+            for (const [field, label] of Object.entries(fields)) {
+                if (!this.questionData[field].trim()) {
+                    this.formError = `${label} is required`;
+                    return false;
+                }
             }
-            if (!this.questionData.option1.trim()) {
-                this.formError = 'Option 1 is required';
-                return false;
-            }
-            if (!this.questionData.option2.trim()) {
-                this.formError = 'Option 2 is required';
-                return false;
-            }
+            
             if (!this.questionData.correct_answer) {
                 this.formError = 'Please select the correct answer';
                 return false;
             }
-            if (this.questionData.question_statement.length > 500) {
-                this.formError = 'Question statement must be less than 500 characters';
-                return false;
-            }
-            if (this.questionData.option1.length > 200 || this.questionData.option2.length > 200) {
-                this.formError = 'Options must be less than 200 characters';
-                return false;
-            }
+            
             this.formError = '';
             return true;
         },
@@ -343,10 +410,80 @@ const QuizAdmin = {
             this.resetQuizForm();
             this.quizModal.hide();
         },
+        validateQuestionField(field) {
+            const labels = {
+                'question_statement': 'Question statement',
+                'option1': 'Option 1',
+                'option2': 'Option 2',
+                'correct_answer': 'Correct answer'
+            };
+
+            if (field === 'correct_answer') {
+                if (!this.questionData.correct_answer) {
+                    this.fieldErrors.correct_answer = 'Please select the correct answer';
+                } else {
+                    this.fieldErrors.correct_answer = '';
+                }
+                return;
+            }
+
+            if (!this.questionData[field]?.trim()) {
+                this.fieldErrors[field] = `${labels[field]} is required`;
+            } else {
+                this.fieldErrors[field] = '';
+            }
+        },
+        validateQuizField(field) {
+            switch(field) {
+                case 'name':
+                    if (!this.quizName.trim()) {
+                        this.quizFieldErrors.name = 'Quiz name is required';
+                    } else {
+                        this.quizFieldErrors.name = '';
+                    }
+                    break;
+                case 'chapter':
+                    if (!this.chapterId) {
+                        this.quizFieldErrors.chapter = 'Please select a chapter';
+                    } else {
+                        this.quizFieldErrors.chapter = '';
+                    }
+                    break;
+                case 'duration':
+                    if (!this.timeDuration || this.timeDuration <= 0) {
+                        this.quizFieldErrors.duration = 'Duration must be a positive number';
+                    } else {
+                        this.quizFieldErrors.duration = '';
+                    }
+                    break;
+            }
+        },
+        getCurrentDate() {
+            return new Date().toISOString().split('T')[0];
+        },
         async saveQuiz() {
             try {
+                // Validate all fields
+                this.validateQuizField('name');
+                this.validateQuizField('chapter');
+                this.validateQuizField('duration');
+                
+                if (this.quizFieldErrors.name || this.quizFieldErrors.chapter || this.quizFieldErrors.duration) {
+                    return;
+                }
+                
+                if (!this.dateOfQuiz) {
+                    this.quizFieldErrors.date = 'Please select a date';
+                    return;
+                }
+                
                 const dateObject = new Date(this.dateOfQuiz);
-                await fetch('/api/quizzes', {
+                if (dateObject < new Date().setHours(0, 0, 0, 0)) {
+                    this.quizFieldErrors.date = 'Date cannot be in the past';
+                    return;
+                }
+                
+                const response = await fetch('/api/quizzes', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -360,10 +497,17 @@ const QuizAdmin = {
                         remarks: this.remarks
                     }),
                 });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.message || 'Failed to save quiz');
+                }
+
                 await this.fetchQuizzes();
                 this.closeQuizModal();
             } catch (error) {
                 console.error('Error saving quiz:', error);
+                this.quizError = error.message || 'Failed to save quiz. Please try again.';
             }
         }
     },

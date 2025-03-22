@@ -9,35 +9,43 @@ const HomeAdmin = {
             </div>
             <div v-for="subject in filteredSubjects" :key="subject.name" class="mb-4">
                 <h2>{{ subject.name }}</h2>
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Chapter Name</th>
-                            <th>Description</th>
-                            <th>Number of Questions</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="chapter in subject.chapters" :key="chapter.id">
-                            <td>{{ chapter.name }}</td>
-                            <td>{{ chapter.description }}</td>
-                            <td>{{ chapter.question_count }}</td>
-                            <td>
-                                <button class="btn btn-sm btn-primary me-2" @click="openEditChapterModal(chapter)">Edit</button>
-                                <button class="btn btn-sm btn-danger" @click="handleDeleteChapter(chapter.id)">Delete</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2">
-                                <button class="btn btn-sm btn-success" @click="openAddChapterModal(subject.name)">Add Chapter</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Chapter Name</th>
+                                <th class="d-none d-md-table-cell">Description</th>
+                                <th>Questions</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="chapter in subject.chapters" :key="chapter.id">
+                                <td>
+                                    {{ chapter.name }}
+                                    <div class="d-md-none text-muted small">{{ chapter.description }}</div>
+                                </td>
+                                <td class="d-none d-md-table-cell">{{ chapter.description }}</td>
+                                <td>{{ chapter.question_count }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-primary" @click="openEditChapterModal(chapter)">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @click="handleDeleteChapter(chapter.id)">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="2">
+                                    <button class="btn btn-sm btn-success" @click="openAddChapterModal(subject.name)">Add Chapter</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <button class="btn btn-primary" @click="openAddSubjectModal">Add Subject</button>
 
+            <!-- Chapter Modal -->
             <div class="modal fade" id="chapterModal" tabindex="-1" aria-labelledby="chapterModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -58,6 +66,7 @@ const HomeAdmin = {
                 </div>
             </div>
 
+            <!-- Subject Modal -->
             <div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -120,8 +129,22 @@ const HomeAdmin = {
     },
     mounted() {
         this.fetchSubjects();
-        this.chapterModal = new bootstrap.Modal(document.getElementById('chapterModal'));
-        this.subjectModal = new bootstrap.Modal(document.getElementById('subjectModal'));
+        // Initialize modals after DOM is mounted
+        this.$nextTick(() => {
+            try {
+                const chapterModalEl = document.getElementById('chapterModal');
+                const subjectModalEl = document.getElementById('subjectModal');
+                
+                if (chapterModalEl && typeof bootstrap !== 'undefined') {
+                    this.chapterModal = new bootstrap.Modal(chapterModalEl);
+                }
+                if (subjectModalEl && typeof bootstrap !== 'undefined') {
+                    this.subjectModal = new bootstrap.Modal(subjectModalEl);
+                }
+            } catch (error) {
+                console.error('Modal initialization error:', error);
+            }
+        });
     },
     methods: {
         async fetchSubjects() {

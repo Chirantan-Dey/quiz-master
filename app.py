@@ -53,6 +53,11 @@ def create_app():
 
     # setup api
     resources.api.init_app(app)
+    
+    # Service Worker route - must be served from root path
+    @app.route('/sw.js')
+    def service_worker():
+        return app.send_static_file('sw.js')
 
     @app.route('/', methods=['POST'])
     def login():

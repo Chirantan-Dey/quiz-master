@@ -1,4 +1,12 @@
+/* Basic styling */
 body {
-  background: linear-gradient(to right, #ee9a46, #3bd5e6);
-  /* background-color: rgb(99, 250, 127); */
+    background-color: #f8f9fa;
+}
+
+/* PWA safe area adjustments */
+@media (display-mode: standalone) {
+    .container {
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
 }
