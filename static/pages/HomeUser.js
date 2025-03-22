@@ -14,7 +14,7 @@ const HomeUser = {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="quiz in quizzes" :key="quiz.id">
+          <tr v-for="quiz in filteredQuizzes" :key="quiz.id">
             <td>{{quiz.id}}</td>
             <td>{{quiz.questions.length}}</td>
             <td>{{formatDate(quiz.date_of_quiz)}}</td>
@@ -138,6 +138,17 @@ const HomeUser = {
       const minutes = Math.floor(this.timeRemainingSeconds / 60);
       const seconds = this.timeRemainingSeconds % 60;
       return `Time Remaining: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    },
+
+    filteredQuizzes() {
+      const query = this.$store.state.search.query.toLowerCase();
+      if (!query) return this.quizzes;
+      
+      return this.quizzes.filter(quiz => 
+        quiz.name.toLowerCase().includes(query) ||
+        (quiz.remarks && quiz.remarks.toLowerCase().includes(query)) ||
+        (this.chapters[quiz.chapter_id]?.name.toLowerCase().includes(query))
+      );
     }
   },
 

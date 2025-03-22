@@ -13,7 +13,7 @@ const ScoreUser = {
 
       <!-- Content -->
       <div v-if="!loading || error">
-        <div v-if="userScores.length === 0" class="alert alert-info">
+        <div v-if="filteredScores.length === 0" class="alert alert-info">
           No scores found. Take some quizzes to see your scores here!
         </div>
         <table v-else class="table table-striped table-hover">
@@ -69,8 +69,33 @@ const ScoreUser = {
       if (!this.$store.state.user?.id) return [];
       return this.scores.filter(score => score.user_id === this.$store.state.user.id);
     },
+    filteredScores() {
+      const query = this.$store.state.search.query.toLowerCase();
+      if (!query) return this.userScores;
+      
+      return this.userScores.filter(score => {
+        const quiz = this.quizzes[score.quiz_id];
+        if (!quiz) return false;
+
+        // Search by quiz name
+        if (quiz.name.toLowerCase().includes(query)) return true;
+
+        // Search by score (number to string comparison)
+        if (score.total_scored.toString().includes(query)) return true;
+
+        // Search by date
+        if (this.formatDate(score.time_stamp_of_attempt).toLowerCase().includes(query)) return true;
+
+        // Search by chapter name if available
+        if (quiz.chapter_id && this.chapters && this.chapters[quiz.chapter_id]) {
+          if (this.chapters[quiz.chapter_id].name.toLowerCase().includes(query)) return true;
+        }
+
+        return false;
+      });
+    },
     sortedScores() {
-      return [...this.userScores].sort((a, b) => {
+      return [...this.filteredScores].sort((a, b) => {
         let aVal = a[this.sortField];
         let bVal = b[this.sortField];
         

@@ -161,7 +161,7 @@ const QuizAdmin = {
                                     type="number"
                                     class="form-control"
                                     v-model.number="timeDuration"
-                                    placeholder="Time Duration"
+                                    placeholder="Enter duration in minutes"
                                     required
                                     min="1"
                                     max="180"
@@ -175,7 +175,7 @@ const QuizAdmin = {
                                     type="text"
                                     class="form-control"
                                     v-model="remarks"
-                                    placeholder="Remarks"
+                                    placeholder="Enter remarks (optional)"
                                 >
                             </div>
                         </div>
@@ -219,7 +219,7 @@ const QuizAdmin = {
             selectedQuizId: null,
             chapterId: '',
             dateOfQuiz: '',
-            timeDuration: 0,
+            timeDuration: '',
             remarks: '',
             chapters: [],
             questionModal: null,
@@ -248,7 +248,7 @@ const QuizAdmin = {
             this.quizName = '';
             this.chapterId = '';
             this.dateOfQuiz = '';
-            this.timeDuration = 0;
+            this.timeDuration = '';
             this.remarks = '';
         },
         async fetchQuizzes() {
@@ -451,7 +451,8 @@ const QuizAdmin = {
                     }
                     break;
                 case 'duration':
-                    if (!this.timeDuration || this.timeDuration <= 0) {
+                    const duration = parseInt(this.timeDuration);
+                    if (!duration || duration <= 0) {
                         this.quizFieldErrors.duration = 'Duration must be a positive number';
                     } else {
                         this.quizFieldErrors.duration = '';
