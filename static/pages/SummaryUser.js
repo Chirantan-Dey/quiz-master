@@ -102,7 +102,11 @@ const SummaryUser = {
   methods: {
     async fetchCharts() {
       try {
-        const response = await fetch('/api/charts/user')
+        const response = await fetch('/api/charts/user', {
+          headers: {
+            'Authentication-Token': this.$store.state.authToken
+          }
+        })
         if (!response.ok) {
           if (response.status === 404) {
             this.noAttempts = true

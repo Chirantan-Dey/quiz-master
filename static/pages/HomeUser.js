@@ -7,6 +7,7 @@ const HomeUser = {
         <thead>
           <tr>
             <th>Quiz ID</th>
+            <th>Quiz Name</th>
             <th>Number of Questions</th>
             <th>Date</th>
             <th>Duration (in minutes)</th>
@@ -16,6 +17,7 @@ const HomeUser = {
         <tbody>
           <tr v-for="quiz in filteredQuizzes" :key="quiz.id">
             <td>{{quiz.id}}</td>
+            <td>{{quiz.name}}</td>
             <td>{{quiz.questions.length}}</td>
             <td>{{formatDate(quiz.date_of_quiz)}}</td>
             <td>{{quiz.time_duration}}</td>

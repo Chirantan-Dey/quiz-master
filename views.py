@@ -47,9 +47,12 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
                     dob=dob_date
                 )
                 db.session.commit()
+                auth_token = user.get_auth_token()
                 return jsonify({
                     'message': 'User account created successfully',
+                    'access_token': auth_token,
                     'user': {
+                        'id': user.id,
                         'email': user.email,
                         'roles': [{'name': 'user'}]
                     }

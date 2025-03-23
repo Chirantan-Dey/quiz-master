@@ -115,7 +115,7 @@ const ScoreUser = {
       try {
         const response = await fetch('/api/scores', {
           headers: {
-            'Authorization': `Bearer ${this.$store.state.authToken}`
+            'Authentication-Token': this.$store.state.authToken
           }
         });
         if (!response.ok) {
@@ -132,7 +132,7 @@ const ScoreUser = {
       try {
         const response = await fetch('/api/quizzes', {
           headers: {
-            'Authorization': `Bearer ${this.$store.state.authToken}`
+            'Authentication-Token': this.$store.state.authToken
           }
         });
         if (!response.ok) {
