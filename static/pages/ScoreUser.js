@@ -5,13 +5,11 @@ const ScoreUser = {
         <h2>Quiz Scores</h2>
       </div>
 
-      <!-- Error Alert -->
       <div v-if="error" class="alert alert-danger alert-dismissible fade show" role="alert">
         {{ error }}
         <button type="button" class="btn-close" @click="error = null"></button>
       </div>
 
-      <!-- Content -->
       <div v-if="!loading || error">
         <div v-if="filteredScores.length === 0" class="alert alert-info">
           No scores found. Take some quizzes to see your scores here!
@@ -77,16 +75,9 @@ const ScoreUser = {
         const quiz = this.quizzes[score.quiz_id];
         if (!quiz) return false;
 
-        // Search by quiz name
         if (quiz.name.toLowerCase().includes(query)) return true;
-
-        // Search by score (number to string comparison)
         if (score.total_scored.toString().includes(query)) return true;
-
-        // Search by date
         if (this.formatDate(score.time_stamp_of_attempt).toLowerCase().includes(query)) return true;
-
-        // Search by chapter name if available
         if (quiz.chapter_id && this.chapters && this.chapters[quiz.chapter_id]) {
           if (this.chapters[quiz.chapter_id].name.toLowerCase().includes(query)) return true;
         }
@@ -99,7 +90,6 @@ const ScoreUser = {
         let aVal = a[this.sortField];
         let bVal = b[this.sortField];
         
-        // Handle dates
         if (this.sortField === 'time_stamp_of_attempt') {
           aVal = aVal ? new Date(aVal).getTime() : 0;
           bVal = bVal ? new Date(bVal).getTime() : 0;

@@ -3,7 +3,6 @@ const SummaryAdmin = {
     <div class="container mt-4">
       <h1 class="text-center mb-4">Summary Admin</h1>
 
-      <!-- Export Section -->
       <div class="row mb-4">
         <div class="col-12">
           <div class="card">
@@ -21,18 +20,15 @@ const SummaryAdmin = {
         </div>
       </div>
 
-      <!-- Success Alert -->
       <div v-if="exportSuccess" class="alert alert-success alert-dismissible fade show" role="alert">
         Export started! You will receive an email when it's ready.
         <button type="button" class="btn-close" @click="exportSuccess = false"></button>
       </div>
 
-      <!-- Error Alert -->
       <div v-if="error" class="alert alert-danger text-center" role="alert">
         {{ error }}
       </div>
 
-      <!-- Charts Section -->
       <div class="row justify-content-center g-4" v-if="!error">
         <div class="col-12 col-md-6">
           <div class="card h-100">
@@ -70,7 +66,6 @@ const SummaryAdmin = {
         </div>
       </div>
 
-      <!-- Chart Modal -->
       <div class="modal fade" id="chartModalAdmin" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
           <div class="modal-content">
@@ -235,7 +230,6 @@ const SummaryAdmin = {
     }
   },
   mounted() {
-    // Redirect non-admin users
     if (!this.isAdmin) {
       this.$router.push('/home-user');
       return;

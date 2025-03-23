@@ -45,7 +45,6 @@ const SummaryUser = {
         </div>
       </div>
 
-      <!-- Modal -->
       <div class="modal fade" id="chartModalUser" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
           <div class="modal-content">

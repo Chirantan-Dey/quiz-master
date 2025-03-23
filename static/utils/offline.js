@@ -16,13 +16,11 @@ export const OfflineMixin = {
         updateOnlineStatus() {
             this.isOffline = !navigator.onLine;
             if (this.isOffline) {
-                // Show offline notification
                 this.$root.$emit('show-notification', {
                     type: 'warning',
                     message: 'You are offline. Some features may be limited.'
                 });
             } else {
-                // Show back online notification
                 this.$root.$emit('show-notification', {
                     type: 'success',
                     message: 'You are back online!'

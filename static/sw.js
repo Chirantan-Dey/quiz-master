@@ -18,7 +18,6 @@ self.addEventListener('install', (event) => {
         Promise.all([
             caches.open(CACHE_NAME)
                 .then((cache) => cache.addAll(ASSETS_TO_CACHE)),
-            // Create blank offline page if it doesn't exist
             fetch(OFFLINE_URL).catch(() => new Response(
                 `<!DOCTYPE html>
                 <html>
@@ -42,7 +41,6 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Handle API requests differently
     if (event.request.url.includes('/api/')) {
         event.respondWith(
             fetch(event.request)
@@ -54,7 +52,6 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Handle navigation requests
     if (event.request.mode === 'navigate') {
         event.respondWith(
             fetch(event.request)
@@ -63,12 +60,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Handle other requests
     event.respondWith(
         caches.match(event.request)
             .then((response) => response || fetch(event.request)
                 .then((response) => {
-                    // Cache successful responses
                     if (response && response.status === 200) {
                         const responseClone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => {
@@ -78,7 +73,6 @@ self.addEventListener('fetch', (event) => {
                     return response;
                 })
                 .catch(() => {
-                    // Return offline page for HTML requests
                     if (event.request.headers.get('accept').includes('text/html')) {
                         return caches.match(OFFLINE_URL);
                     }

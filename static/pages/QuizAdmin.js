@@ -465,7 +465,6 @@ const QuizAdmin = {
         },
         async saveQuiz() {
             try {
-                // Validate all fields
                 this.validateQuizField('name');
                 this.validateQuizField('chapter');
                 this.validateQuizField('duration');

@@ -11,12 +11,11 @@ const Notification = {
         return {
             show: false,
             message: '',
-            type: 'info', // success, warning, danger, info
+            type: 'info',
             timeout: null
         };
     },
     created() {
-        // Listen for notification requests
         this.$root.$on('show-notification', ({ type, message, duration = 3000 }) => {
             this.showNotification(type, message, duration);
         });
@@ -29,17 +28,14 @@ const Notification = {
     },
     methods: {
         showNotification(type, message, duration) {
-            // Clear any existing timeout
             if (this.timeout) {
                 clearTimeout(this.timeout);
             }
             
-            // Show new notification
             this.type = type;
             this.message = message;
             this.show = true;
             
-            // Auto-hide after duration
             this.timeout = setTimeout(() => {
                 this.show = false;
             }, duration);

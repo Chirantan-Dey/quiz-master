@@ -78,7 +78,6 @@ const Login = {
     async submitInfo() {
       this.error = "";
       
-      // Validate form before submitting
       if (!this.validateForm()) {
         return;
       }

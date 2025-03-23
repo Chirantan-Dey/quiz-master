@@ -62,7 +62,6 @@ const Navbar = {
       return this.isAdmin ? '/summary-admin' : '/summary-user';
     },
     showSearch() {
-      // Don't show search on login/signup pages
       return !['/', '/login', '/signup'].includes(this.$route.path);
     },
     hasSearch() {
@@ -97,7 +96,6 @@ const Navbar = {
     }
   },
   watch: {
-    // Clear search when route changes
     '$route'() {
       this.clearSearch();
     }

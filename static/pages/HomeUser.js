@@ -1,7 +1,6 @@
 const HomeUser = {
   template: `
     <div class="container mt-4">
-      <!-- Quiz Table -->
       <h2>Quizzes</h2>
       <table class="table">
         <thead>
@@ -29,7 +28,6 @@ const HomeUser = {
         </tbody>
       </table>
 
-      <!-- View Quiz Modal -->
       <div class="modal fade" id="viewQuizModal" tabindex="-1">
         <div class="modal-dialog">
           <div class="modal-content">
@@ -50,7 +48,6 @@ const HomeUser = {
         </div>
       </div>
 
-      <!-- Start Quiz Modal -->
       <div class="modal fade" id="startQuizModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
           <div class="modal-content">
@@ -60,7 +57,6 @@ const HomeUser = {
             </div>
             <div class="modal-body">
               <div class="row">
-                <!-- Left sidebar with question numbers -->
                 <div class="col-3">
                   <div class="list-group">
                     <a 
@@ -76,7 +72,6 @@ const HomeUser = {
                   </div>
                 </div>
                 
-                <!-- Main question area -->
                 <div class="col-9">
                   <div v-if="currentQuestion">
                     <p class="h5 mb-4">Question {{currentQuestionIndex + 1}}: {{currentQuestion.question_statement}}</p>
@@ -205,7 +200,6 @@ const HomeUser = {
     },
 
     startTimer(duration) {
-      // Convert duration from minutes to seconds
       this.timeRemainingSeconds = duration * 60;
       if (this.timerInterval) {
         clearInterval(this.timerInterval);
@@ -216,7 +210,7 @@ const HomeUser = {
         } else {
           this.submitQuiz();
         }
-      }, 1000); // Update every second
+      }, 1000);
     },
 
     showQuestion(index) {

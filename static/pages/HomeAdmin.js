@@ -45,7 +45,6 @@ const HomeAdmin = {
             </div>
             <button class="btn btn-primary" @click="openAddSubjectModal">Add Subject</button>
 
-            <!-- Chapter Modal -->
             <div class="modal fade" id="chapterModal" tabindex="-1" aria-labelledby="chapterModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -66,7 +65,6 @@ const HomeAdmin = {
                 </div>
             </div>
 
-            <!-- Subject Modal -->
             <div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -107,16 +105,13 @@ const HomeAdmin = {
             if (!query) return this.subjects;
             
             return this.subjects.map(subject => {
-                // Check if subject matches
                 const subjectMatches = subject.name.toLowerCase().includes(query);
                 
-                // Filter chapters
-                const filteredChapters = subject.chapters.filter(chapter => 
+                const filteredChapters = subject.chapters.filter(chapter =>
                     chapter.name.toLowerCase().includes(query) ||
                     (chapter.description && chapter.description.toLowerCase().includes(query))
                 );
                 
-                // Keep subject if it matches or has matching chapters
                 if (subjectMatches || filteredChapters.length > 0) {
                     return {
                         ...subject,
@@ -124,12 +119,11 @@ const HomeAdmin = {
                     };
                 }
                 return null;
-            }).filter(Boolean); // Remove null subjects
+            }).filter(Boolean);
         }
     },
     mounted() {
         this.fetchSubjects();
-        // Initialize modals after DOM is mounted
         this.$nextTick(() => {
             try {
                 const chapterModalEl = document.getElementById('chapterModal');
