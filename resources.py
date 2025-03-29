@@ -21,6 +21,14 @@ quiz_fields = {
     'time_duration': fields.Integer,
     'remarks': fields.String,
     'name': fields.String,
+    'questions': fields.List(fields.Nested({
+        'id': fields.Integer,
+        'quiz_id': fields.Integer,
+        'question_statement': fields.String,
+        'option1': fields.String,
+        'option2': fields.String,
+        'correct_answer': fields.String
+    }))
 }
 
 question_fields = {
@@ -107,7 +115,11 @@ class QuizResource(Resource):
     @marshal_with(quiz_fields)
     @cache.cached(timeout=1, key_prefix='quiz_list')
     def get(self):
-        return Quiz.query.all()
+        quizzes = Quiz.query.all()
+        # Eager load questions for each quiz
+        for quiz in quizzes:
+            quiz.questions = Questions.query.filter_by(quiz_id=quiz.id).all()
+        return quizzes
 
     @auth_required('token', 'session')
     @marshal_with(quiz_fields)
@@ -143,6 +155,7 @@ class QuizResource(Resource):
         )
         db.session.add(quiz)
         db.session.commit()
+        quiz.questions = []  # Initialize empty questions array for new quiz
         cache.delete('quiz_list')
         return quiz
 
@@ -161,18 +174,67 @@ class QuestionResource(Resource):
     @auth_required('token', 'session')
     @marshal_with(question_fields)
     def post(self):
-        parser.add_argument('quiz_id', type=int, required=True)
-        parser.add_argument('question_statement', type=str, required=True)
-        parser.add_argument('option1', type=str, required=True)
-        parser.add_argument('option2', type=str, required=True)
-        parser.add_argument('correct_answer', type=str, required=True)
-        args = parser.parse_args()
+        try:
+            parser.add_argument('quiz_id', type=int, required=True)
+            parser.add_argument('question_statement', type=str, required=True)
+            parser.add_argument('option1', type=str, required=True)
+            parser.add_argument('option2', type=str, required=True)
+            parser.add_argument('correct_answer', type=str, required=True)
+            args = parser.parse_args()
 
-        question = Questions(**args)
-        db.session.add(question)
-        db.session.commit()
-        cache.delete_memoized(self.get)
-        return question
+            question = Questions(**args)
+            db.session.add(question)
+            db.session.commit()
+            cache.delete_memoized(self.get)
+            cache.delete('quiz_list')  # Also clear quiz list cache since questions are nested
+            return question
+        except Exception as e:
+            db.session.rollback()
+            return {"message": str(e)}, 400
+
+    @auth_required('token', 'session')
+    @marshal_with(question_fields)
+    def put(self, id):
+        try:
+            parser.add_argument('quiz_id', type=int, required=True)
+            parser.add_argument('question_statement', type=str, required=True)
+            parser.add_argument('option1', type=str, required=True)
+            parser.add_argument('option2', type=str, required=True)
+            parser.add_argument('correct_answer', type=str, required=True)
+            args = parser.parse_args()
+
+            question = Questions.query.get(id)
+            if not question:
+                return {"message": "Question not found"}, 404
+
+            question.quiz_id = args['quiz_id']
+            question.question_statement = args['question_statement']
+            question.option1 = args['option1']
+            question.option2 = args['option2']
+            question.correct_answer = args['correct_answer']
+
+            db.session.commit()
+            cache.delete_memoized(self.get)
+            cache.delete('quiz_list')  # Also clear quiz list cache since questions are nested
+            return question
+        except Exception as e:
+            db.session.rollback()
+            return {"message": str(e)}, 400
+
+    @auth_required('token', 'session')
+    def delete(self, id):
+        try:
+            question = Questions.query.get(id)
+            if not question:
+                return {"message": "Question not found"}, 404
+            db.session.delete(question)
+            db.session.commit()
+            cache.delete_memoized(self.get)
+            cache.delete('quiz_list')  # Also clear quiz list cache since questions are nested
+            return {"message": "Question deleted"}, 200
+        except Exception as e:
+            db.session.rollback()
+            return {"message": f"Failed to delete question: {str(e)}"}, 500
 
 class ScoreResource(Resource):
     @auth_required('token', 'session')

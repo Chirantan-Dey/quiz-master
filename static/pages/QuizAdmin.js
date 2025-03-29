@@ -231,10 +231,25 @@ const QuizAdmin = {
             const query = this.$store.state.search.query.toLowerCase();
             if (!query) return this.quizzes;
             
-            return this.quizzes.filter(quiz => 
-                quiz.name.toLowerCase().includes(query) ||
-                (quiz.remarks && quiz.remarks.toLowerCase().includes(query))
-            );
+            return this.quizzes.filter(quiz => {
+                // Check if quiz name or remarks match
+                if (quiz.name.toLowerCase().includes(query) ||
+                    (quiz.remarks && quiz.remarks.toLowerCase().includes(query))) {
+                    return true;
+                }
+                
+                // Check if any question in the quiz matches
+                if (quiz.questions && quiz.questions.length > 0) {
+                    return quiz.questions.some(question => 
+                        question.question_statement.toLowerCase().includes(query) ||
+                        question.option1.toLowerCase().includes(query) ||
+                        question.option2.toLowerCase().includes(query) ||
+                        question.correct_answer.toLowerCase().includes(query)
+                    );
+                }
+                
+                return false;
+            });
         }
     },
     mounted() {
@@ -279,6 +294,7 @@ const QuizAdmin = {
         },
         openEditQuestionModal(question) {
             this.editingQuestion = question;
+            this.selectedQuizId = question.quiz_id;
             this.questionData = {
                 question_statement: question.question_statement,
                 option1: question.option1,
@@ -511,7 +527,7 @@ const QuizAdmin = {
                 this.quizError = error.message || 'Failed to save quiz. Please try again.';
             }
         }
-    },
+    }
 };
 
 export default QuizAdmin;

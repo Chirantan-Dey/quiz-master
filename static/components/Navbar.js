@@ -71,7 +71,7 @@ const Navbar = {
       const path = this.$route.path;
       const placeholders = {
         'home': 'Search subjects and chapters...',
-        'quiz': 'Search quizzes...',
+        'quiz': 'Search quizzes and questions...',
         'score': 'Search scores...',
         'summary': 'Search results...'
       };
