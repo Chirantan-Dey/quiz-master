@@ -48,11 +48,11 @@ def create_app():
     app.config['SECURITY_CSRF_PROTECT_MECHANISMS'] = ['session', 'token']
     app.config['SECURITY_CSRF_IGNORE_UNAUTH_ENDPOINTS'] = False
 
-    # setup the view
-    views.create_views(app, user_datastore, db)
-
-    # setup api
+    # setup api first to take precedence
     resources.api.init_app(app)
+
+    # setup the views (excluding question routes)
+    views.create_views(app, user_datastore, db)
     
     # Service Worker route - must be served from root path
     @app.route('/sw.js')
