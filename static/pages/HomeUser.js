@@ -10,19 +10,29 @@ const HomeUser = {
             <th>Number of Questions</th>
             <th>Date</th>
             <th>Duration (in minutes)</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="quiz in filteredQuizzes" :key="quiz.id">
+          <tr v-for="quiz in filteredQuizzes" :key="quiz.id" :class="{'table-secondary': isQuizExpired(quiz)}">
             <td>{{quiz.id}}</td>
             <td>{{quiz.name}}</td>
             <td>{{quiz.questions.length}}</td>
             <td>{{formatDate(quiz.date_of_quiz)}}</td>
             <td>{{quiz.time_duration}}</td>
             <td>
+              <span v-if="isQuizExpired(quiz)" class="badge bg-secondary">Expired</span>
+              <span v-else class="badge bg-success">Available</span>
+            </td>
+            <td>
               <button class="btn btn-secondary me-2" @click="viewQuiz(quiz)">View</button>
-              <button class="btn btn-primary" @click="startQuiz(quiz)">Start</button>
+              <button 
+                class="btn btn-primary" 
+                @click="startQuiz(quiz)"
+                :disabled="isQuizExpired(quiz)"
+                :title="isQuizExpired(quiz) ? 'This quiz has expired' : ''"
+              >Start</button>
             </td>
           </tr>
         </tbody>
@@ -42,13 +52,18 @@ const HomeUser = {
               <p><strong>Number of Questions:</strong> {{selectedQuiz.questions.length}}</p>
               <p><strong>Date:</strong> {{formatDate(selectedQuiz.date_of_quiz)}}</p>
               <p><strong>Duration (in minutes):</strong> {{selectedQuiz.time_duration}}</p>
+              <p><strong>Status:</strong> 
+                <span :class="isQuizExpired(selectedQuiz) ? 'badge bg-secondary' : 'badge bg-success'">
+                  {{isQuizExpired(selectedQuiz) ? 'Expired' : 'Available'}}
+                </span>
+              </p>
               <p><strong>Remarks:</strong> {{selectedQuiz.remarks}}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="modal fade" id="startQuizModal" tabindex="-1">
+      <div class="modal fade" id="startQuizModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-lg">
           <div class="modal-content">
             <div class="modal-header">
@@ -79,21 +94,23 @@ const HomeUser = {
                       <input 
                         type="radio" 
                         class="form-check-input"
+                        :id="'q'+currentQuestionIndex+'opt1'"
                         :name="'q'+currentQuestionIndex"
                         :value="currentQuestion.option1"
                         v-model="currentAnswer"
                       >
-                      <label class="form-check-label">{{currentQuestion.option1}}</label>
+                      <label class="form-check-label" :for="'q'+currentQuestionIndex+'opt1'">{{currentQuestion.option1}}</label>
                     </div>
                     <div class="form-check mb-4">
                       <input 
                         type="radio" 
                         class="form-check-input"
+                        :id="'q'+currentQuestionIndex+'opt2'"
                         :name="'q'+currentQuestionIndex"
                         :value="currentQuestion.option2"
                         v-model="currentAnswer"
                       >
-                      <label class="form-check-label">{{currentQuestion.option2}}</label>
+                      <label class="form-check-label" :for="'q'+currentQuestionIndex+'opt2'">{{currentQuestion.option2}}</label>
                     </div>
                     <div class="d-flex justify-content-between">
                       <button class="btn btn-primary" @click="saveAndNext">Save and Next</button>
@@ -116,7 +133,7 @@ const HomeUser = {
       selectedQuiz: null,
       currentQuiz: null,
       currentQuestionIndex: 0,
-      currentAnswer: null,
+      currentAnswer: '',
       answers: new Map(),
       timeRemainingSeconds: 0,
       timerInterval: null,
@@ -149,7 +166,47 @@ const HomeUser = {
     }
   },
 
+  watch: {
+    currentQuestionIndex: {
+      immediate: true,
+      handler(index) {
+        // When question changes, load saved answer if it exists
+        this.$nextTick(() => {
+          const savedAnswer = this.answers.get(index);
+          this.currentAnswer = savedAnswer || '';
+        });
+      }
+    }
+  },
+
   methods: {
+    initializeModals() {
+      if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap is not loaded');
+        return;
+      }
+
+      try {
+        const viewModalEl = document.getElementById('viewQuizModal');
+        const startModalEl = document.getElementById('startQuizModal');
+        
+        if (viewModalEl) {
+          this.viewModal = new bootstrap.Modal(viewModalEl);
+        }
+        if (startModalEl) {
+          this.startModal = new bootstrap.Modal(startModalEl);
+        }
+      } catch (error) {
+        console.error('Error initializing modals:', error);
+      }
+    },
+
+    isQuizExpired(quiz) {
+      if (!quiz || !quiz.date_of_quiz) return true;
+      const quizDate = new Date(quiz.date_of_quiz);
+      return quizDate < new Date();
+    },
+
     async fetchQuizzes() {
       try {
         const response = await fetch('/api/quizzes', {
@@ -157,6 +214,9 @@ const HomeUser = {
             'Authentication-Token': this.$store.state.authToken
           }
         });
+        if (!response.ok) {
+          throw new Error('Failed to fetch quizzes');
+        }
         this.quizzes = await response.json();
       } catch (error) {
         console.error('Error fetching quizzes:', error);
@@ -170,6 +230,9 @@ const HomeUser = {
             'Authentication-Token': this.$store.state.authToken
           }
         });
+        if (!response.ok) {
+          throw new Error('Failed to fetch chapters');
+        }
         const chapters = await response.json();
         this.chapters = chapters.reduce((acc, chapter) => {
           acc[chapter.id] = chapter;
@@ -187,16 +250,24 @@ const HomeUser = {
 
     viewQuiz(quiz) {
       this.selectedQuiz = quiz;
-      this.viewModal.show();
+      if (this.viewModal) {
+        this.viewModal.show();
+      }
     },
 
     startQuiz(quiz) {
+      if (this.isQuizExpired(quiz)) {
+        alert('This quiz has expired and cannot be attempted.');
+        return;
+      }
       this.currentQuiz = quiz;
       this.currentQuestionIndex = 0;
       this.answers = new Map();
-      this.currentAnswer = null;
+      this.currentAnswer = '';
       this.startTimer(quiz.time_duration);
-      this.startModal.show();
+      if (this.startModal) {
+        this.startModal.show();
+      }
     },
 
     startTimer(duration) {
@@ -215,7 +286,6 @@ const HomeUser = {
 
     showQuestion(index) {
       this.currentQuestionIndex = index;
-      this.currentAnswer = this.answers.get(index) || null;
     },
 
     isAnswered(index) {
@@ -224,16 +294,24 @@ const HomeUser = {
 
     saveAndNext() {
       if (this.currentAnswer) {
+        // Save the current answer
         this.answers.set(this.currentQuestionIndex, this.currentAnswer);
-        this.currentQuestionIndex = 
-          (this.currentQuestionIndex + 1) % this.currentQuiz.questions.length;
-        this.currentAnswer = this.answers.get(this.currentQuestionIndex) || null;
+        
+        // Move to next question
+        const nextIndex = (this.currentQuestionIndex + 1) % this.currentQuiz.questions.length;
+        this.currentQuestionIndex = nextIndex;
       }
     },
 
     async submitQuiz() {
       if (this.timerInterval) {
         clearInterval(this.timerInterval);
+      }
+
+      if (this.isQuizExpired(this.currentQuiz)) {
+        alert('This quiz has expired. Your submission cannot be accepted.');
+        this.startModal.hide();
+        return;
       }
 
       // Calculate score
@@ -245,7 +323,7 @@ const HomeUser = {
       });
 
       try {
-        await fetch('/api/scores', {
+        const response = await fetch('/api/scores', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -258,20 +336,35 @@ const HomeUser = {
           })
         });
 
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.message || 'Failed to submit quiz');
+        }
+
         this.startModal.hide();
       } catch (error) {
         console.error('Error submitting quiz:', error);
+        alert(error.message || 'Failed to submit quiz. Please try again.');
       }
     }
   },
 
   async mounted() {
-    await Promise.all([
-      this.fetchQuizzes(),
-      this.fetchChapters()
-    ]);
-    this.viewModal = new bootstrap.Modal(document.getElementById('viewQuizModal'));
-    this.startModal = new bootstrap.Modal(document.getElementById('startQuizModal'));
+    try {
+      await Promise.all([
+        this.fetchQuizzes(),
+        this.fetchChapters()
+      ]);
+
+      // Wait for Vue to update the DOM
+      this.$nextTick(() => {
+        setTimeout(() => {
+          this.initializeModals();
+        }, 100);
+      });
+    } catch (error) {
+      console.error('Error in mounted:', error);
+    }
   },
 
   beforeUnmount() {

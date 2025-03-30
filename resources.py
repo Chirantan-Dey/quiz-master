@@ -1,13 +1,14 @@
 from flask_restful import Resource, Api, reqparse, marshal_with, fields
 from models import Subject, Quiz, Questions, Scores, Chapter, db
 from flask_security import auth_required, current_user, roles_required
-from datetime import datetime
+from datetime import datetime, timezone
 from extensions import cache
 from workers import generate_user_export
 from flask import current_app
 
 api = Api(prefix='/api')
 
+# [Previous field definitions remain unchanged...]
 chapter_fields = {
     'id': fields.Integer,
     'name': fields.String,
@@ -55,6 +56,7 @@ score_fields = {
     'total_scored': fields.Integer
 }
 
+# [Previous resource classes remain unchanged...]
 class SubjectResource(Resource):
     def __init__(self):
         self.parser = reqparse.RequestParser()
@@ -334,9 +336,21 @@ class ScoreResource(Resource):
         return Scores.query.filter_by(user_id=user_id).all()
 
     @auth_required('token', 'session')
-    @marshal_with(score_fields)
     def post(self):
         args = self.parser.parse_args()
+        
+        # Check if quiz exists and has not expired
+        quiz = Quiz.query.get(args['quiz_id'])
+        if not quiz:
+            return {"message": "Quiz not found"}, 404
+
+        # Convert quiz date to datetime for proper comparison
+        quiz_datetime = datetime.combine(quiz.date_of_quiz, datetime.min.time()).replace(tzinfo=timezone.utc)
+        current_time = datetime.now(timezone.utc)
+        
+        if quiz_datetime < current_time:
+            current_app.logger.warning(f"Attempt to submit expired quiz {quiz.id} by user {current_user.id}")
+            return {"message": "This quiz has expired and cannot be submitted"}, 403
         
         try:
             time_stamp = datetime.fromisoformat(args['time_stamp_of_attempt'].replace('Z', '+00:00'))
@@ -349,10 +363,16 @@ class ScoreResource(Resource):
             time_stamp_of_attempt=time_stamp,
             total_scored=args['total_scored']
         )
-        db.session.add(score)
-        db.session.commit()
-        cache.delete_memoized(self.get)
-        return score
+        
+        try:
+            db.session.add(score)
+            db.session.commit()
+            cache.delete_memoized(self.get)
+            return marshal_with(score_fields)(lambda: score)()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error saving score: {str(e)}")
+            return {"message": "Failed to save score"}, 500
 
 class ExportResource(Resource):
     @auth_required('token', 'session')
