@@ -217,13 +217,11 @@ const QuizAdmin = {
             if (!query) return this.quizzes;
             
             return this.quizzes.filter(quiz => {
-                // Check if quiz name or remarks match
                 if (quiz.name.toLowerCase().includes(query) ||
                     (quiz.remarks && quiz.remarks.toLowerCase().includes(query))) {
                     return true;
                 }
                 
-                // Check if any question in the quiz matches
                 if (quiz.questions && quiz.questions.length > 0) {
                     return quiz.questions.some(question => 
                         question.question_statement.toLowerCase().includes(query) ||

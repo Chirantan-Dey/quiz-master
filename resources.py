@@ -8,7 +8,6 @@ from flask import current_app
 
 api = Api(prefix='/api')
 
-# Define nested fields for chapters in subjects
 chapter_fields = {
     'id': fields.Integer,
     'name': fields.String,
@@ -143,7 +142,6 @@ class QuizResource(Resource):
     @cache.cached(timeout=1, key_prefix='quiz_list')
     def get(self):
         quizzes = Quiz.query.all()
-        # Eager load questions for each quiz
         for quiz in quizzes:
             quiz.questions = Questions.query.filter_by(quiz_id=quiz.id).all()
         return quizzes
@@ -174,7 +172,7 @@ class QuizResource(Resource):
         )
         db.session.add(quiz)
         db.session.commit()
-        quiz.questions = []  # Initialize empty questions array for new quiz
+        quiz.questions = []
         cache.delete('quiz_list')
         return quiz
 
@@ -208,7 +206,7 @@ class QuestionResource(Resource):
             db.session.add(question)
             db.session.commit()
             cache.delete_memoized(self.get)
-            cache.delete('quiz_list')  # Also clear quiz list cache since questions are nested
+            cache.delete('quiz_list')
             return question
         except Exception as e:
             db.session.rollback()
@@ -232,7 +230,7 @@ class QuestionResource(Resource):
 
             db.session.commit()
             cache.delete_memoized(self.get)
-            cache.delete('quiz_list')  # Also clear quiz list cache since questions are nested
+            cache.delete('quiz_list')
             return question
         except Exception as e:
             db.session.rollback()
@@ -247,7 +245,7 @@ class QuestionResource(Resource):
             db.session.delete(question)
             db.session.commit()
             cache.delete_memoized(self.get)
-            cache.delete('quiz_list')  # Also clear quiz list cache since questions are nested
+            cache.delete('quiz_list')
             return {"message": "Question deleted"}, 200
         except Exception as e:
             db.session.rollback()
@@ -283,7 +281,7 @@ class ChapterResource(Resource):
         db.session.add(chapter)
         db.session.commit()
         cache.delete('chapter_list')
-        cache.delete('subject_list')  # Also clear subjects cache since chapters are nested
+        cache.delete('subject_list')
         return chapter
 
     @auth_required('token', 'session')
@@ -295,7 +293,7 @@ class ChapterResource(Resource):
             db.session.delete(chapter)
             db.session.commit()
             cache.delete('chapter_list')
-            cache.delete('subject_list')  # Also clear subjects cache since chapters are nested
+            cache.delete('subject_list')
             return {"message": "Chapter deleted"}, 200
         except Exception as e:
             db.session.rollback()
@@ -315,7 +313,7 @@ class ChapterResource(Resource):
         try:
             db.session.commit()
             cache.delete('chapter_list')
-            cache.delete('subject_list')  # Also clear subjects cache since chapters are nested
+            cache.delete('subject_list')
             return chapter
         except Exception as e:
             db.session.rollback()
@@ -360,7 +358,6 @@ class ExportResource(Resource):
     @auth_required('token', 'session')
     @roles_required('admin')
     def post(self):
-        """Start a background task to export user data"""
         task = None
         try:
             task = generate_user_export.delay(current_user.email)            

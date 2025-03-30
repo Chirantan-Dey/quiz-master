@@ -9,26 +9,22 @@ from flask_security.utils import verify_password
 def create_app():
     app = Flask(__name__)
 
-    # configuration
     app.config['DEBUG'] = True
     app.config['SECRET_KEY'] = 'NbrKrOgSTkiVDItpfQzjF6UuX0jNJcuwTKX6MypiCJQ'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
     app.config['SECURITY_PASSWORD_SALT'] = '9RrPTYTgV4c-iFafQeB7RQ'
     app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'] = 'Authentication-Token'
     
-    # Cache configuration
     app.config['CACHE_TYPE'] = 'redis'
     app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
     app.config['CACHE_DEFAULT_TIMEOUT'] = 1
     
-    # Mail configuration (MailHog)
     app.config['MAIL_SERVER'] = 'localhost'
-    app.config['MAIL_PORT'] = 1025  # MailHog SMTP port
+    app.config['MAIL_PORT'] = 1025
     app.config['MAIL_USE_TLS'] = False
     app.config['MAIL_USE_SSL'] = False
     app.config['MAIL_DEFAULT_SENDER'] = 'quiz-master@example.com'
     
-    # Initialize extensions
     db.init_app(app)
     cache.init_app(app)
     mail.init_app(app)
@@ -43,18 +39,14 @@ def create_app():
         db.create_all()
         create_initial_data.create_data(user_datastore)
         
-    # enable CSRF protection
     app.config["WTF_CSRF_CHECK_DEFAULT"] = True
     app.config['SECURITY_CSRF_PROTECT_MECHANISMS'] = ['session', 'token']
     app.config['SECURITY_CSRF_IGNORE_UNAUTH_ENDPOINTS'] = False
 
-    # setup api first to take precedence
     resources.api.init_app(app)
 
-    # setup the views (excluding question routes)
     views.create_views(app, user_datastore, db)
     
-    # Service Worker route - must be served from root path
     @app.route('/sw.js')
     def service_worker():
         return app.send_static_file('sw.js')
@@ -64,7 +56,6 @@ def create_app():
         try:
             data = request.get_json()
             
-            # Check if required fields are present
             if not data or 'email' not in data or 'password' not in data:
                 return jsonify({
                     'message': 'Email and password are required'
@@ -87,7 +78,6 @@ def create_app():
                     'message': 'Invalid credentials'
                 }), 401
 
-            # Successful login
             login_user(user)
             auth_token = user.get_auth_token()
             return jsonify({

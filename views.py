@@ -107,7 +107,6 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
     @cache.memoize(timeout=1)  
     def get_admin_charts():
         try:
-            # Clean up old charts first
             charts.cleanup_charts()
             
             scores_chart = charts.generate_admin_subject_scores()
@@ -131,7 +130,6 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
     @cache.memoize(timeout=1)  
     def get_user_charts():
         try:
-            # Clean up old charts first
             charts.cleanup_charts()
             
             questions_chart = charts.generate_user_subject_questions()
