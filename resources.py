@@ -8,7 +8,6 @@ from flask import current_app
 
 api = Api(prefix='/api')
 
-# [Previous field definitions remain unchanged...]
 chapter_fields = {
     'id': fields.Integer,
     'name': fields.String,
@@ -56,7 +55,6 @@ score_fields = {
     'total_scored': fields.Integer
 }
 
-# [Previous resource classes remain unchanged...]
 class SubjectResource(Resource):
     def __init__(self):
         self.parser = reqparse.RequestParser()
@@ -77,7 +75,6 @@ class SubjectResource(Resource):
             
             chapters = Chapter.query.filter_by(subject_id=subject.id).all()
             for chapter in chapters:
-                # Calculate total questions for this chapter
                 total_questions = 0
                 quizzes = Quiz.query.filter_by(chapter_id=chapter.id).all()
                 for quiz in quizzes:
@@ -339,12 +336,10 @@ class ScoreResource(Resource):
     def post(self):
         args = self.parser.parse_args()
         
-        # Check if quiz exists and has not expired
         quiz = Quiz.query.get(args['quiz_id'])
         if not quiz:
             return {"message": "Quiz not found"}, 404
 
-        # Convert quiz date to datetime for proper comparison
         quiz_datetime = datetime.combine(quiz.date_of_quiz, datetime.min.time()).replace(tzinfo=timezone.utc)
         current_time = datetime.now(timezone.utc)
         

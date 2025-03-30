@@ -216,23 +216,28 @@ const QuizAdmin = {
             const query = this.$store.state.search.query.toLowerCase();
             if (!query) return this.quizzes;
             
-            return this.quizzes.filter(quiz => {
+            return this.quizzes.map(quiz => {
                 if (quiz.name.toLowerCase().includes(query) ||
                     (quiz.remarks && quiz.remarks.toLowerCase().includes(query))) {
-                    return true;
+                    return quiz;
                 }
                 
-                if (quiz.questions && quiz.questions.length > 0) {
-                    return quiz.questions.some(question => 
-                        question.question_statement.toLowerCase().includes(query) ||
-                        question.option1.toLowerCase().includes(query) ||
-                        question.option2.toLowerCase().includes(query) ||
-                        question.correct_answer.toLowerCase().includes(query)
-                    );
+                const matchingQuestions = quiz.questions.filter(question => 
+                    question.question_statement.toLowerCase().includes(query) ||
+                    question.option1.toLowerCase().includes(query) ||
+                    question.option2.toLowerCase().includes(query) ||
+                    question.correct_answer.toLowerCase().includes(query)
+                );
+                
+                if (matchingQuestions.length > 0) {
+                    return {
+                        ...quiz,
+                        questions: matchingQuestions
+                    };
                 }
                 
-                return false;
-            });
+                return null;
+            }).filter(quiz => quiz !== null);
         }
     },
     mounted() {

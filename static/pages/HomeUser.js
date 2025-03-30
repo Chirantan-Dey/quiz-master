@@ -170,7 +170,6 @@ const HomeUser = {
     currentQuestionIndex: {
       immediate: true,
       handler(index) {
-        // When question changes, load saved answer if it exists
         this.$nextTick(() => {
           const savedAnswer = this.answers.get(index);
           this.currentAnswer = savedAnswer || '';
@@ -294,10 +293,7 @@ const HomeUser = {
 
     saveAndNext() {
       if (this.currentAnswer) {
-        // Save the current answer
         this.answers.set(this.currentQuestionIndex, this.currentAnswer);
-        
-        // Move to next question
         const nextIndex = (this.currentQuestionIndex + 1) % this.currentQuiz.questions.length;
         this.currentQuestionIndex = nextIndex;
       }
@@ -314,7 +310,6 @@ const HomeUser = {
         return;
       }
 
-      // Calculate score
       let totalScore = 0;
       this.currentQuiz.questions.forEach((question, index) => {
         if (this.answers.get(index) === question.correct_answer) {
@@ -356,7 +351,6 @@ const HomeUser = {
         this.fetchChapters()
       ]);
 
-      // Wait for Vue to update the DOM
       this.$nextTick(() => {
         setTimeout(() => {
           this.initializeModals();

@@ -10,7 +10,6 @@ import os
 import sys
 import io
 
-# Ensure app directory is in path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 celery = Celery('quiz_master')
@@ -34,7 +33,6 @@ class Config:
         }
     }
 
-# Update Celery config
 celery.conf.update(
     broker_url=Config.CELERY_BROKER_URL,
     result_backend=Config.CELERY_RESULT_BACKEND,
@@ -47,13 +45,11 @@ celery.conf.update(
 )
 
 def get_flask_app():
-    """Get Flask app instance"""
     try:
         print("Creating Flask app...")  
         from app import create_app
         flask_app = create_app()
         print("Flask app created successfully")  
-        # Initialize flask-excel with the app
         init_excel(flask_app)
         return flask_app
     except Exception as e:
@@ -62,7 +58,6 @@ def get_flask_app():
         raise
 
 def ensure_context(f):
-    """Ensure function runs within Flask app context"""
     @wraps(f)
     def wrapper(*args, **kwargs):
         try:
@@ -76,7 +71,6 @@ def ensure_context(f):
     return wrapper
 
 def log_task_status(name):
-    """Decorator to log task status"""
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -94,7 +88,6 @@ def log_task_status(name):
     return decorator
 
 def format_email_style():
-    """Return CSS styles for email templates"""
     return """
     <style>
         body {
@@ -138,7 +131,6 @@ def format_email_style():
     """
 
 def format_email_html(content, title):
-    """Format HTML content with styling"""
     return f"""
     <!DOCTYPE html>
     <html>
@@ -153,14 +145,11 @@ def format_email_html(content, title):
     """
 
 def generate_csv(data):
-    """Generate CSV data from array"""
     try:
         response = make_response_from_array(data, "csv")
         if response and hasattr(response, 'get_data'):
             return response.get_data()
         else:
-            # Fallback to manual CSV generation
-            print("Falling back to manual CSV generation")  
             output = io.StringIO()
             for row in data:
                 output.write(','.join(str(cell) for cell in row) + '\n')
@@ -173,7 +162,6 @@ def generate_csv(data):
 @ensure_context
 @log_task_status("daily_reminders")
 def send_daily_reminders():
-    """Send daily quiz reminders to users"""
     from models import User, Quiz, Role
     from extensions import mail
     
@@ -247,7 +235,6 @@ def send_daily_reminders():
 @ensure_context
 @log_task_status("monthly_reports")
 def send_monthly_reports():
-    """Send monthly performance reports to users"""
     from models import User, Quiz, Subject, Role
     from extensions import mail
     
@@ -351,7 +338,6 @@ def send_monthly_reports():
 @ensure_context
 @log_task_status("user_export")
 def generate_user_export(admin_email):
-    """Generate detailed user export"""
     from models import User, Subject, Role
     from extensions import mail
     
@@ -452,6 +438,5 @@ def generate_user_export(admin_email):
         print(error_msg)
         raise
 
-# Only include celery.py in Python path when running as main module
 if __name__ == '__main__':
     celery.start()

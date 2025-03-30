@@ -104,7 +104,7 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
     @app.route('/api/charts/admin')
     @auth_required('token', 'session')
     @roles_required('admin')
-    @cache.memoize(timeout=1)  
+    @cache.memoize(timeout=1)
     def get_admin_charts():
         try:
             charts.cleanup_charts()
@@ -127,7 +127,7 @@ def create_views(app: Flask, user_datastore: SQLAlchemySessionUserDatastore, db)
 
     @app.route('/api/charts/user')
     @auth_required('token', 'session')
-    @cache.memoize(timeout=1)  
+    @cache.memoize(timeout=1)
     def get_user_charts():
         try:
             charts.cleanup_charts()
